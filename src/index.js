@@ -2,7 +2,7 @@ import app from './config/app.js';
 import env from './config/env.js';
 import logger from './config/logger.js';
 import prisma from './config/db.js';
-
+import process from 'process';
 let server = null;
 
 const startServer = async () => {

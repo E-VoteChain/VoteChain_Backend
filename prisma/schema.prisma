@@ -2,7 +2,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
@@ -104,8 +103,8 @@ model User {
   wallet_address String  @unique
   first_name     String?
   last_name      String?
-  email          String?
-  phone_number   String?
+  email          String? @unique
+  phone_number   Int?    @unique
   is_verified    Boolean @default(false)
   has_voted      Boolean @default(false)
   election_id    String? @db.ObjectId

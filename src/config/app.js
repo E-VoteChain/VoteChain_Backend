@@ -9,6 +9,8 @@ import * as path from 'path';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import logger from './logger.js';
 
+import authRoutes from '../routes/auth.routes.js';
+
 const app = express();
 
 app.use(helmet());
@@ -36,5 +38,8 @@ app.use((req, res, next) => {
   logger.info(`${req.method} ${req.url}`);
   next();
 });
+
+// Routes
+app.use('/api/v1/auth', authRoutes);
 
 export default app;

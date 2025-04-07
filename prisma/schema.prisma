@@ -2,9 +2,21 @@ generator client {
   provider = "prisma-client-js"
 }
 
+
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Status {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model State {
@@ -97,6 +109,8 @@ model User {
   is_verified    Boolean @default(false)
   has_voted      Boolean @default(false)
   election_id    String? @db.ObjectId
+  role           Role    @default(USER)
+  status         Status  @default(PENDING)
 
   Election Election? @relation(fields: [election_id], references: [id])
 

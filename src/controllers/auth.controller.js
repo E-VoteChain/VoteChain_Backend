@@ -5,8 +5,19 @@ import { BAD_REQUEST, CREATED, INTERNAL_SERVER } from '../constants/index.js';
 import logger from '../config/logger.js';
 import { getUserById, saveUser, update_user } from '../services/auth.services.js';
 import { generateToken } from '../utils/user.js';
-
 import env from '../config/env.js';
+import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
+
+
+cloudinary.config({ 
+  cloud_name: env.cloudinary.cloud_name, 
+  api_key: env.cloudinary.api_key,
+  api_secret: env.cloudinary.api_secret,
+});
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 export const register = async (req, res, next) => {
   try {
@@ -67,22 +78,46 @@ export const register = async (req, res, next) => {
 
 export const update_profile = async (req, res, next) => {
   try {
-    const user = updateUserSchema.parse(req.body);
-    const { user_id } = req.user;
+    const userData = updateUserSchema.parse(req.body);
+    const { user_id } = req.user; // assuming populated from auth middleware
 
-    update_user(user_id, user).then((updated_user) => {
-      return res.status(CREATED).json({
-        message: 'User updated successfully',
-        data: updated_user,
+    let imageUrl = null;
+
+    if (req.file) {
+      // Upload the image to Cloudinary
+      const uploadResult = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { resource_type: 'auto' },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result);
+          }
+        );
+        uploadStream.end(req.file.buffer);
       });
-    });
-  } catch (error) {
-    if (error instanceof Error) {
-      const error = formatError(error);
-      return next(new AppError(error, BAD_REQUEST));
+
+      imageUrl = uploadResult.secure_url;
     }
 
-    logger.error('Error while creating user', error);
+    const updatedUserData = {
+      ...userData,
+      ...(imageUrl && { profile_image: imageUrl }), // add image if uploaded
+    };
+
+    const updated_user = await update_user(user_id, updatedUserData);
+
+    return res.status(CREATED).json({
+      message: 'User updated successfully',
+      data: updated_user,
+    });
+
+  } catch (error) {
+    if (error instanceof Error) {
+      const parsedError = formatError(error);
+      return next(new AppError(parsedError, BAD_REQUEST));
+    }
+
+    logger.error('Error while updating user', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
 };

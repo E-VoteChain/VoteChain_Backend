@@ -13,6 +13,9 @@ export const envSchema = z
       .number()
       .default(30)
       .describe('Access token expiration time in minutes'),
+    CLOUDINARY_CLOUD_NAME: z.string().describe('Cloudinary cloud name'),
+    CLOUDINARY_API_KEY: z.string().describe('Cloudinary API key'),
+    CLOUDINARY_API_SECRET: z.string().describe('Cloudinary API secret'),
   })
   .passthrough();
 
@@ -31,5 +34,10 @@ export default {
   jwt: {
     access_secret: env.JWT_ACCESS_SECRET,
     accessExpirationMinutes: 30,
+  },
+  cloudinary: {
+    cloud_name: env.CLOUDINARY_CLOUD_NAME,
+    api_key: env.CLOUDINARY_API_KEY,
+    api_secret: env.CLOUDINARY_API_SECRET,
   },
 };

@@ -5,7 +5,8 @@ import { Readable } from 'stream';
 import * as path from 'path';
 import ejs from 'ejs';
 import AppError from './AppError.js';
-import { BAD_REQUEST } from '../constants/index.js';
+import { BAD_REQUEST, INTERNAL_SERVER } from '../constants/index.js';
+import logger from '../config/logger.js';
 
 export const formatError = (error) => {
   let errors = {};
@@ -51,10 +52,38 @@ export const validateUserStatus = (user) => {
 
   const statusErrors = {
     APPROVED: 'User already approved',
-    REJECTED: 'User already rejected'
+    REJECTED: 'User already rejected',
   };
 
   if (statusErrors[user.status]) {
     throw new AppError(statusErrors[user.status], BAD_REQUEST);
   }
+};
+
+export const errorHandler = (err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+
+  logger.error(`${req.method} ${req.originalUrl} - ${err.message}`, {
+    statusCode,
+    stack: err.stack,
+    errors: err.errors || null,
+  });
+
+  if (err instanceof AppError) {
+    return res.status(statusCode).json({
+      message: err.message,
+      ...(err.errors && { errors: err.errors }),
+    });
+  }
+
+  if (err.errors && Array.isArray(err.errors)) {
+    return res.status(BAD_REQUEST).json({
+      message: 'Validation failed',
+      errors: formatError(err),
+    });
+  }
+
+  return res.status(INTERNAL_SERVER).json({
+    message: 'Something went wrong',
+  });
 };

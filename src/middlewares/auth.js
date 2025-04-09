@@ -7,14 +7,7 @@ export const verify_token = async (req, res, next) => {
   const token = req.cookies.access_token;
 
   if (!token) {
-    next(
-      new AppError(
-        {
-          message: 'No Authorization token found',
-        },
-        UN_AUTHORIZED
-      )
-    );
+    return next(new AppError('No Authorization token found', UN_AUTHORIZED));
   }
 
   try {
@@ -24,42 +17,13 @@ export const verify_token = async (req, res, next) => {
     return next();
   } catch (error) {
     console.log('error', error);
-    next(
-      new AppError(
-        {
-          message: 'Invalid token',
-        },
-        UN_AUTHENTICATED
-      )
-    );
+    return next(new AppError('Invalid token', UN_AUTHENTICATED));
   }
-};
-
-export const isUser = async (req, res, next) => {
-  if (req.user.role !== 'voter') {
-    next(
-      new AppError(
-        {
-          message: 'You are not authorized to perform this action',
-        },
-        UN_AUTHORIZED
-      )
-    );
-  }
-
-  return next();
 };
 
 export const isAdmin = async (req, res, next) => {
   if (req.user.role !== 'admin') {
-    next(
-      new AppError(
-        {
-          message: 'You are not authorized to perform this action',
-        },
-        UN_AUTHORIZED
-      )
-    );
+    return next(new AppError('You are not authorized to perform this action', UN_AUTHORIZED));
   }
 
   return next();

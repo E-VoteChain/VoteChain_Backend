@@ -74,9 +74,9 @@ export const updateUserSchema = z.object({
 });
 
 export const approve_user_schema = z.object({
-  user_id: z.string().uuid(),
+  wallet_address: z.string(),
 });
 
 export const reject_user_schema = z.object({
-  user_id: z.string().uuid(),
+  wallet_address: z.string(),
 });

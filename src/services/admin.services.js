@@ -4,7 +4,7 @@ export const save_approve_user = async (payload) => {
   try {
     const data = await prisma.user.update({
       where: {
-        id: payload.user_id,
+        wallet_address: payload.wallet_address,
       },
       data: {
         status: 'APPROVED',
@@ -22,7 +22,7 @@ export const save_reject_user = async (payload) => {
   try {
     const data = await prisma.user.update({
       where: {
-        id: payload.user_id,
+        wallet_address: payload.wallet_address,
       },
       data: {
         status: 'REJECTED',

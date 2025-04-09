@@ -4,7 +4,7 @@ import { BAD_REQUEST, INTERNAL_SERVER, OK } from '../constants/index.js';
 import logger from '../config/logger.js';
 import { approve_user_schema } from '../validations/index.js';
 import { getUserById } from '../services/auth.services.js';
-import { save_approve_user } from '../services/admin.services.js';
+import { save_approve_user, save_reject_user } from '../services/admin.services.js';
 import { queryUsers } from '../services/user.services.js';
 
 export const get_users =async(req,res,next)=>{
@@ -32,13 +32,13 @@ export const get_users =async(req,res,next)=>{
 
 export const approve_user = async (req, res, next) => {
   try {
-    const { user_id } = approve_user_schema.parse(req.body);
+    const { wallet_address } = approve_user_schema.parse(req.body);
 
-    const user = await getUserById(user_id, 'wallet_address role status');
+    const user = await getUserById(wallet_address, 'wallet_address role status');
 
     validateUserStatus(user)
   
-    save_approve_user({ user_id }).then(async () => {
+    save_approve_user({ wallet_address }).then(async () => {
       return res.sendStatus(OK);
     });
   } catch (error) {
@@ -55,14 +55,14 @@ export const approve_user = async (req, res, next) => {
 
 export const reject_user = async (req, res, next) => {
   try {
-    const { user_id } = approve_user_schema.parse(req.body);
+    const { wallet_address } = approve_user_schema.parse(req.body);
 
-    const user = await getUserById(user_id, 'wallet_address role status');
+    const user = await getUserById(wallet_address, 'wallet_address role status');
 
     validateUserStatus(user)
 
 
-    save_approve_user({ user_id }).then(async () => {
+    save_reject_user({ wallet_address }).then(async () => {
       return res.sendStatus(OK);
     });
   } catch (error) {

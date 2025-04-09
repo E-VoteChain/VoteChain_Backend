@@ -14,7 +14,7 @@ import prisma from '../config/db.js';
  * @param {string} model - The name of the Prisma model (e.g., 'user')
  * @param {Object} filter - Query filter
  * @param {Object} options - Query options
- * @param {string} options.sortBy - Sorting criteria (e.g., 'createdAt:desc')
+ * @param {string} options.sortBy - Sorting criteria (e.g., 'created_at:desc')
  * @param {string} options.populate - Populate related fields (e.g., 'profile.address')
  * @param {number} options.limit - Number of items per page
  * @param {number} options.page - Page number
@@ -31,7 +31,7 @@ export const paginate = async (model, filter = {}, options = {}) => {
     });
     orderBy = sortingCriteria;
   } else {
-    orderBy = { createdAt: 'desc' };
+    orderBy = { created_at: 'desc' };
   }
 
   const skip = (page - 1) * limit;

@@ -33,11 +33,12 @@ export const saveUser = async (payload) => {
 export const update_user = async (id, payload) => {
   try {
     const user = await prisma.user.update({
-      where: { id: id },
+      where: { wallet_address: id },
       data: payload,
     });
     return user;
   } catch (err) {
+    console.log('Error while updating user', err);
     return err;
   }
 };

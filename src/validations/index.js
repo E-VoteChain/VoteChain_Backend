@@ -15,7 +15,6 @@ export const updateUserSchema = z.object({
     .min(2, {
       message: 'First name must be at least 2 characters long',
     }),
-
   last_name: z
     .string({
       required_error: 'Last name is required',
@@ -36,16 +35,40 @@ export const updateUserSchema = z.object({
     .regex(/^\d+$/, {
       message: 'Phone number must contain only digits',
     }),
-
-  email: z
+  email: z.string().refine(
+    (val) => {
+      return !val || val.length <= 50;
+    },
+    {
+      message: 'Email must be less than 50 characters',
+    }
+  ),
+  state: z
     .string()
-    .optional()
-    .refine(
-      (val) => {
-        return val.length <= 50;
-      },
-      {
-        message: 'Email must be less than 50 characters',
-      }
-    ),
+    .min(1, {
+      message: 'State is required',
+    })
+    .trim()
+    .toLowerCase(),
+  district: z
+    .string()
+    .min(1, {
+      message: 'District is required',
+    })
+    .trim()
+    .toLowerCase(),
+  mandal: z
+    .string()
+    .min(1, {
+      message: 'Mandal is required',
+    })
+    .trim()
+    .toLowerCase(),
+  constituency: z
+    .string()
+    .min(1, {
+      message: 'Constituency is required',
+    })
+    .trim()
+    .toLowerCase(),
 });

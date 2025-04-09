@@ -1,4 +1,4 @@
-import { formatError } from '../utils/helper.js';
+import { formatError, generateSlug, upload_to_cloudinary } from '../utils/helper.js';
 import { register_user, updateUserSchema } from '../validations/index.js';
 import AppError from '../utils/AppError.js';
 import { BAD_REQUEST, CREATED, INTERNAL_SERVER } from '../constants/index.js';
@@ -6,26 +6,17 @@ import logger from '../config/logger.js';
 import { getUserById, saveUser, update_user } from '../services/auth.services.js';
 import { generateToken } from '../utils/user.js';
 import env from '../config/env.js';
-import multer from 'multer';
-import { v2 as cloudinary } from 'cloudinary';
-
-
-cloudinary.config({ 
-  cloud_name: env.cloudinary.cloud_name, 
-  api_key: env.cloudinary.api_key,
-  api_secret: env.cloudinary.api_secret,
-});
-
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+import { getLocationBySlug, save_state } from '../services/location.services.js';
 
 export const register = async (req, res, next) => {
   try {
     const { wallet_address, role } = register_user.parse(req.body);
+    console.log('wallet_address', wallet_address);
 
-    const existing_user = await getUserById(wallet_address);
+    const existing_user = await getUserById(wallet_address, 'wallet_address role');
 
     if (existing_user) {
+      console.log('User already exists', existing_user);
       const access_token = generateToken({
         user_id: existing_user.wallet_address,
         role: existing_user.role === 'ADMIN' ? 'admin' : 'user',
@@ -34,6 +25,11 @@ export const register = async (req, res, next) => {
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
         sameSite: 'strict',
+      });
+
+      return res.status(CREATED).json({
+        message: 'User Successfully Logged in',
+        data: existing_user,
       });
     }
 
@@ -78,39 +74,52 @@ export const register = async (req, res, next) => {
 
 export const update_profile = async (req, res, next) => {
   try {
-    const userData = updateUserSchema.parse(req.body);
-    const { user_id } = req.user; // assuming populated from auth middleware
-
-    let imageUrl = null;
+    const { first_name, last_name, phone_number, email, state, mandal, district, constituency } =
+      updateUserSchema.parse(req.body);
+    console.log('req.user', req.user);
+    const { user_id } = req.user;
+    let image_url = null;
 
     if (req.file) {
-      // Upload the image to Cloudinary
-      const uploadResult = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { resource_type: 'auto' },
-          (error, result) => {
-            if (error) return reject(error);
-            resolve(result);
-          }
-        );
-        uploadStream.end(req.file.buffer);
-      });
-
-      imageUrl = uploadResult.secure_url;
+      const file_buffer = req.file.buffer;
+      image_url = await upload_to_cloudinary(file_buffer);
     }
 
-    const updatedUserData = {
-      ...userData,
-      ...(imageUrl && { profile_image: imageUrl }), // add image if uploaded
+    const location_payload = {
+      state: state,
+      district: district,
+      mandal: mandal,
+      constituency: constituency,
     };
 
-    const updated_user = await update_user(user_id, updatedUserData);
+    const location_slug = generateSlug(location_payload);
+
+    const existing_location = await getLocationBySlug(location_slug, 'location_slug');
+
+    if (!existing_location) {
+      const location = {
+        ...location_payload,
+        location_slug: location_slug,
+      };
+
+      const data = await save_state(location);
+      console.log('data', data);
+    }
+
+    const user_payload = {
+      first_name: first_name,
+      last_name: last_name,
+      phone_number: phone_number,
+      email: email,
+      profile_image: image_url,
+    };
+
+    const updated_user = await update_user(user_id, user_payload);
 
     return res.status(CREATED).json({
       message: 'User updated successfully',
       data: updated_user,
     });
-
   } catch (error) {
     if (error instanceof Error) {
       const parsedError = formatError(error);

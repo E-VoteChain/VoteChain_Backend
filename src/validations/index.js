@@ -72,3 +72,11 @@ export const updateUserSchema = z.object({
     .trim()
     .toLowerCase(),
 });
+
+export const approve_user_schema = z.object({
+  user_id: z.string().uuid(),
+});
+
+export const reject_user_schema = z.object({
+  user_id: z.string().uuid(),
+});

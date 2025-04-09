@@ -4,6 +4,8 @@ import { cloudinary } from '../config/cloudinary.js';
 import { Readable } from 'stream';
 import * as path from 'path';
 import ejs from 'ejs';
+import AppError from './AppError.js';
+import { BAD_REQUEST } from '../constants/index.js';
 
 export const formatError = (error) => {
   let errors = {};
@@ -26,13 +28,10 @@ export const renderEmailEjs = async (fileName, payload) => {
 
 export const upload_to_cloudinary = (fileBuffer) => {
   return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: 'votechain' },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result.secure_url);
-      }
-    );
+    const stream = cloudinary.uploader.upload_stream({ folder: 'votechain' }, (error, result) => {
+      if (error) return reject(error);
+      resolve(result.secure_url);
+    });
 
     const readable = new Readable();
     readable.push(fileBuffer);
@@ -43,4 +42,19 @@ export const upload_to_cloudinary = (fileBuffer) => {
 
 export const generateSlug = (payload) => {
   return `${payload.state}-${payload.district}-${payload.mandal}-${payload.constituency}`;
+};
+
+export const validateUserStatus = (user) => {
+  if (!user) {
+    throw new AppError('User not found', BAD_REQUEST);
+  }
+
+  const statusErrors = {
+    APPROVED: 'User already approved',
+    REJECTED: 'User already rejected'
+  };
+
+  if (statusErrors[user.status]) {
+    throw new AppError(statusErrors[user.status], BAD_REQUEST);
+  }
 };

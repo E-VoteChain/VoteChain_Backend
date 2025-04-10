@@ -80,3 +80,19 @@ export const approve_user_schema = z.object({
 export const reject_user_schema = z.object({
   wallet_address: z.string(),
 });
+
+export const create_election_schema = z.object({
+  election_name: z.string().nonempty('Election name is required'),
+  election_start_time: z
+    .string()
+    .nonempty('Election start time is required')
+    .refine((val) => !isNaN(Date.parse(val)), {
+      message: 'Invalid date format',
+    }),
+  election_end_time: z
+    .string()
+    .nonempty('Election end time is required')
+    .refine((val) => !isNaN(Date.parse(val)), {
+      message: 'Invalid date format',
+    }),
+});

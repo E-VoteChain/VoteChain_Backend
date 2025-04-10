@@ -76,3 +76,23 @@ export const reject_user = async (req, res, next) => {
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
 };
+
+
+export const create_election = async (req, res, next) => {
+  try {
+    const { election_name, election_start_time, election_end_time } = req.body;
+
+    // Validate the request body
+    if (!election_name || !election_start_time || !election_end_time) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Logic to create an election
+    // You can replace this with your actual implementation
+
+    return res.status(201).json({ message: 'Election created successfully' });
+  } catch (error) {
+    logger.error('Error while creating election', error);
+    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+  }
+}

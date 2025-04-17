@@ -2,9 +2,6 @@ import * as z from 'zod';
 
 export const register_user = z.object({
   wallet_address: z.string().nonempty('Wallet address is required'),
-  role: z.enum(['admin', 'user'], {
-    error_map: () => ({ message: 'Role is required' }),
-  }),
 });
 
 export const updateUserSchema = z.object({

@@ -5,6 +5,7 @@ import { extractUser } from '../utils/user.js';
 
 export const verify_token = async (req, res, next) => {
   const token = req.cookies.access_token;
+  console.log('token', token);
 
   if (!token) {
     return next(new AppError('No Authorization token found', UN_AUTHORIZED));

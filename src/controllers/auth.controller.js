@@ -1,26 +1,42 @@
 import { formatError, generateSlug, upload_to_cloudinary } from '../utils/helper.js';
 import { register_user, updateUserSchema } from '../validations/index.js';
 import AppError from '../utils/AppError.js';
-import { BAD_REQUEST, CREATED, INTERNAL_SERVER } from '../constants/index.js';
+import { BAD_REQUEST, CREATED, INTERNAL_SERVER, OK } from '../constants/index.js';
 import logger from '../config/logger.js';
-import { getUserById, saveUser, update_user } from '../services/auth.services.js';
+import { getUserById, getUserDetails, saveUser, update_user } from '../services/auth.services.js';
 import { generateToken } from '../utils/user.js';
 import env from '../config/env.js';
 import { getLocationBySlug, save_state } from '../services/location.services.js';
 
 export const register = async (req, res, next) => {
   try {
-    const { wallet_address, role } = register_user.parse(req.body);
-    console.log('wallet_address', wallet_address);
+    const { wallet_address } = register_user.parse(req.body);
 
     const existing_user = await getUserById(wallet_address, 'wallet_address role');
 
     if (existing_user) {
-      console.log('User already exists', existing_user);
       const access_token = generateToken({
         user_id: existing_user.wallet_address,
         role: existing_user.role === 'ADMIN' ? 'admin' : 'user',
       });
+
+      let profile_completed = true;
+
+      const user_details = await getUserDetails(
+        existing_user.id,
+        'first_name last_name phone_number email'
+      );
+
+      if (user_details === null) {
+        profile_completed = false;
+      }
+
+      res.cookie('access_token', access_token, {
+        httpOnly: true,
+        secure: env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+
       res.cookie('access_token', access_token, {
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
@@ -28,17 +44,14 @@ export const register = async (req, res, next) => {
       });
 
       return res.status(CREATED).json({
-        message: 'User Successfully Logged in',
-        data: existing_user,
+        profile_completed: profile_completed,
       });
     }
 
     const user = {
       wallet_address: wallet_address,
-      role: role === 'admin' ? 'ADMIN' : 'USER',
     };
 
-    console.log('User', user);
     saveUser(user)
       .then(async (saved_user) => {
         const access_token = generateToken({
@@ -51,9 +64,9 @@ export const register = async (req, res, next) => {
           secure: env.NODE_ENV === 'production',
           sameSite: 'strict',
         });
+
         return res.status(CREATED).json({
-          message: 'User created successfully',
-          data: saved_user,
+          profile_completed: false,
         });
       })
       .catch((error) => {
@@ -61,7 +74,6 @@ export const register = async (req, res, next) => {
         return next(new AppError('Something went wrong', INTERNAL_SERVER));
       });
   } catch (error) {
-    console.log('error', error);
     if (error instanceof Error) {
       const error = formatError(error);
       return next(new AppError(error, BAD_REQUEST));
@@ -76,9 +88,14 @@ export const update_profile = async (req, res, next) => {
   try {
     const { first_name, last_name, phone_number, email, state, mandal, district, constituency } =
       updateUserSchema.parse(req.body);
-    console.log('req.user', req.user);
-    const { user_id } = req.user;
+    const { user_id: wallet_address } = req.user;
     let image_url = null;
+
+    const user = await getUserById(wallet_address, 'id');
+
+    if (!user) {
+      return next(new AppError('User not found', BAD_REQUEST));
+    }
 
     if (req.file) {
       const file_buffer = req.file.buffer;
@@ -102,8 +119,7 @@ export const update_profile = async (req, res, next) => {
         location_slug: location_slug,
       };
 
-      const data = await save_state(location);
-      console.log('data', data);
+      await save_state(location);
     }
 
     const user_payload = {
@@ -114,12 +130,17 @@ export const update_profile = async (req, res, next) => {
       profile_image: image_url,
     };
 
-    const updated_user = await update_user(user_id, user_payload);
-
-    return res.status(CREATED).json({
-      message: 'User updated successfully',
-      data: updated_user,
-    });
+    update_user(user.id, user_payload)
+      .then((saved_user) => {
+        return res.status(CREATED).json({
+          message: 'User updated successfully',
+          data: saved_user,
+        });
+      })
+      .catch((error) => {
+        logger.error('Error while updating user', error);
+        return next(new AppError('Something went wrong', INTERNAL_SERVER));
+      });
   } catch (error) {
     if (error instanceof Error) {
       const parsedError = formatError(error);
@@ -127,6 +148,38 @@ export const update_profile = async (req, res, next) => {
     }
 
     logger.error('Error while updating user', error);
+    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+  }
+};
+
+export const decode_jwt = async (req, res, next) => {
+  try {
+    const { user_id: wallet_address } = req.user;
+
+    const user = await getUserById(
+      wallet_address,
+      'wallet_address role first_name last_name phone_number email status'
+    );
+
+    return res.status(OK).json({
+      message: 'User decoded successfully',
+      data: user,
+    });
+  } catch (error) {
+    console.log('error', error);
+    logger.error('Error while updating user', error);
+    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+  }
+};
+
+export const logout = async (req, res, next) => {
+  try {
+    res.clearCookie('access_token');
+    return res.status(OK).json({
+      message: 'User logged out successfully',
+    });
+  } catch (error) {
+    logger.error('Error while logging out user', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
 };

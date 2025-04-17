@@ -9,6 +9,15 @@ export const getUserById = async (id, fields = '') => {
   });
 };
 
+export const getUserDetails = async (id, fields = '') => {
+  return await prisma.user.findUnique({
+    where: { wallet_address: id },
+    select: fields
+      ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
+      : undefined,
+  });
+};
+
 export const getUserByEmail = async (email, fields = '') => {
   const user = await prisma.user.findUnique({
     where: { email: email },
@@ -26,20 +35,29 @@ export const saveUser = async (payload) => {
     });
     return user;
   } catch (err) {
-    console.log('err', err);
     return err;
   }
 };
 
 export const update_user = async (id, payload) => {
+  const { first_name, last_name, phone_number, email, profile_image } = payload;
   try {
     const user = await prisma.user.update({
-      where: { wallet_address: id },
-      data: payload,
+      where: { _id: id },
+      data: {
+        UserDetails: {
+          create: {
+            first_name: first_name,
+            last_name: last_name,
+            phone_number: phone_number,
+            email: email,
+            profile_image: profile_image,
+          },
+        },
+      },
     });
     return user;
   } catch (err) {
-    console.log('Error while updating user', err);
     return err;
   }
 };

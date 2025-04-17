@@ -2,7 +2,16 @@ import prisma from '../config/db.js';
 
 export const getUserById = async (id, fields = '') => {
   return await prisma.user.findUnique({
-    where: { wallet_address: id },
+    where: { id: id },
+    select: fields
+      ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
+      : undefined,
+  });
+};
+
+export const getUserByWalletAddress = async (wallet_address, fields = '') => {
+  return await prisma.user.findUnique({
+    where: { wallet_address: wallet_address },
     select: fields
       ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
       : undefined,
@@ -10,8 +19,8 @@ export const getUserById = async (id, fields = '') => {
 };
 
 export const getUserDetails = async (id, fields = '') => {
-  return await prisma.user.findUnique({
-    where: { wallet_address: id },
+  return await prisma.userDetails.findUnique({
+    where: { id: id },
     select: fields
       ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
       : undefined,
@@ -29,6 +38,7 @@ export const getUserByEmail = async (email, fields = '') => {
 };
 
 export const saveUser = async (payload) => {
+  console.log('Payload', payload);
   try {
     const user = await prisma.user.create({
       data: payload,

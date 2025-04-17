@@ -3,7 +3,13 @@ import { register_user, updateUserSchema } from '../validations/index.js';
 import AppError from '../utils/AppError.js';
 import { BAD_REQUEST, CREATED, INTERNAL_SERVER, OK } from '../constants/index.js';
 import logger from '../config/logger.js';
-import { getUserById, getUserDetails, saveUser, update_user } from '../services/auth.services.js';
+import {
+  getUserById,
+  getUserByWalletAddress,
+  getUserDetails,
+  saveUser,
+  update_user,
+} from '../services/auth.services.js';
 import { generateToken } from '../utils/user.js';
 import env from '../config/env.js';
 import { getLocationBySlug, save_state } from '../services/location.services.js';
@@ -12,7 +18,7 @@ export const register = async (req, res, next) => {
   try {
     const { wallet_address } = register_user.parse(req.body);
 
-    const existing_user = await getUserById(wallet_address, 'wallet_address role');
+    const existing_user = await getUserByWalletAddress(wallet_address, 'wallet_address role');
 
     if (existing_user) {
       const access_token = generateToken({
@@ -55,8 +61,10 @@ export const register = async (req, res, next) => {
     saveUser(user)
       .then(async (saved_user) => {
         const access_token = generateToken({
-          user_id: saved_user.wallet_address,
+          user_id: saved_user.id,
+          wallet_address: saved_user.wallet_address,
           role: saved_user.role === 'ADMIN' ? 'admin' : 'user',
+          status: saved_user.status,
         });
 
         res.cookie('access_token', access_token, {
@@ -88,10 +96,10 @@ export const update_profile = async (req, res, next) => {
   try {
     const { first_name, last_name, phone_number, email, state, mandal, district, constituency } =
       updateUserSchema.parse(req.body);
-    const { user_id: wallet_address } = req.user;
+    const { user_id } = req.user;
     let image_url = null;
 
-    const user = await getUserById(wallet_address, 'id');
+    const user = await getUserById(user_id, 'id');
 
     if (!user) {
       return next(new AppError('User not found', BAD_REQUEST));
@@ -154,12 +162,16 @@ export const update_profile = async (req, res, next) => {
 
 export const decode_jwt = async (req, res, next) => {
   try {
-    const { user_id: wallet_address } = req.user;
+    const { user_id, wallet_address, role, status } = req.user;
 
-    const user = await getUserById(
+    const userDetails = await getUserDetails(user_id, 'first_name last_name phone_number email');
+
+    const user = {
+      ...userDetails,
       wallet_address,
-      'wallet_address role first_name last_name phone_number email status'
-    );
+      role,
+      status,
+    };
 
     return res.status(OK).json({
       message: 'User decoded successfully',

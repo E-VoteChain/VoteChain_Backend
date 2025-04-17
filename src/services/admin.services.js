@@ -1,10 +1,10 @@
 import prisma from '../config/db.js';
 
-export const save_approve_user = async (payload) => {
+export const save_approve_user = async (user_id) => {
   try {
     const data = await prisma.user.update({
       where: {
-        wallet_address: payload.wallet_address,
+        id: user_id,
       },
       data: {
         status: 'APPROVED',
@@ -18,11 +18,11 @@ export const save_approve_user = async (payload) => {
   }
 };
 
-export const save_reject_user = async (payload) => {
+export const save_reject_user = async (user_id) => {
   try {
     const data = await prisma.user.update({
       where: {
-        wallet_address: payload.wallet_address,
+        id: user_id,
       },
       data: {
         status: 'REJECTED',

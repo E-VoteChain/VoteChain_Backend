@@ -7,7 +7,7 @@ import { getUserById } from '../services/auth.services.js';
 import { save_approve_user, save_reject_user } from '../services/admin.services.js';
 import { queryUsers } from '../services/user.services.js';
 
-export const get_users =async(req,res,next)=>{
+export const get_users = async (req, res, next) => {
   try {
     const { page = 1, limit = 10, sortBy, filter } = req.query;
     const options = {
@@ -16,7 +16,7 @@ export const get_users =async(req,res,next)=>{
       sort: sortBy,
     };
 
-    const result=await queryUsers(filter,options);
+    const result = await queryUsers(filter, options);
 
     return res.status(200).send({
       page: result.page,
@@ -28,17 +28,17 @@ export const get_users =async(req,res,next)=>{
     logger.error('Error while creating user', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
-}
+};
 
 export const approve_user = async (req, res, next) => {
   try {
-    const { wallet_address } = approve_user_schema.parse(req.body);
+    const { user_id } = approve_user_schema.parse(req.body);
 
-    const user = await getUserById(wallet_address, 'wallet_address role status');
+    const user = await getUserById(user_id, 'wallet_address role status');
 
-    validateUserStatus(user)
-  
-    save_approve_user({ wallet_address }).then(async () => {
+    validateUserStatus(user);
+
+    save_approve_user({ user_id }).then(async () => {
       return res.sendStatus(OK);
     });
   } catch (error) {
@@ -55,14 +55,13 @@ export const approve_user = async (req, res, next) => {
 
 export const reject_user = async (req, res, next) => {
   try {
-    const { wallet_address } = approve_user_schema.parse(req.body);
+    const { user_id } = approve_user_schema.parse(req.body);
 
-    const user = await getUserById(wallet_address, 'wallet_address role status');
+    const user = await getUserById(user_id, 'wallet_address role status');
 
-    validateUserStatus(user)
+    validateUserStatus(user);
 
-
-    save_reject_user({ wallet_address }).then(async () => {
+    save_reject_user({ user_id }).then(async () => {
       return res.sendStatus(OK);
     });
   } catch (error) {
@@ -76,7 +75,6 @@ export const reject_user = async (req, res, next) => {
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
 };
-
 
 export const create_election = async (req, res, next) => {
   try {
@@ -95,4 +93,4 @@ export const create_election = async (req, res, next) => {
     logger.error('Error while creating election', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
-}
+};

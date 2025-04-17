@@ -18,11 +18,13 @@ export const register = async (req, res, next) => {
   try {
     const { wallet_address } = register_user.parse(req.body);
 
-    const existing_user = await getUserByWalletAddress(wallet_address, 'wallet_address role');
+    const existing_user = await getUserByWalletAddress(wallet_address, 'id wallet_address role');
 
     if (existing_user) {
       const access_token = generateToken({
-        user_id: existing_user.wallet_address,
+        user_id: existing_user.id,
+        wallet_address: existing_user.wallet_address,
+        status: existing_user.status,
         role: existing_user.role === 'ADMIN' ? 'admin' : 'user',
       });
 

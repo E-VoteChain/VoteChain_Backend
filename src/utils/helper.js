@@ -7,6 +7,7 @@ import ejs from 'ejs';
 import AppError from './AppError.js';
 import { BAD_REQUEST, INTERNAL_SERVER } from '../constants/index.js';
 import logger from '../config/logger.js';
+import { location_slug_validation } from '../validations/index.js';
 
 export const formatError = (error) => {
   let errors = {};
@@ -42,7 +43,9 @@ export const upload_to_cloudinary = (fileBuffer) => {
 };
 
 export const generateSlug = (payload) => {
-  return `${payload.state}-${payload.district}-${payload.mandal}-${payload.constituency}`;
+  const { state, district, mandal, constituency } = location_slug_validation.parse(payload);
+
+  return `${state}-${district}-${mandal}-${constituency}`;
 };
 
 export const validateUserStatus = (user) => {

@@ -93,3 +93,10 @@ export const create_election_schema = z.object({
       message: 'Invalid date format',
     }),
 });
+
+export const location_slug_validation = z.object({
+  state: z.string().nonempty('State is required').trim().toLowerCase(),
+  district: z.string().nonempty('District is required').trim().toLowerCase(),
+  mandal: z.string().nonempty('Mandal is required').trim().toLowerCase(),
+  constituency: z.string().nonempty('Constituency is required').trim().toLowerCase(),
+});

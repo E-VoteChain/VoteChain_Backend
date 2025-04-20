@@ -11,6 +11,7 @@ import logger from './logger.js';
 
 import authRoutes from '../routes/auth.routes.js';
 import adminRoutes from '../routes/admin.routes.js';
+import locationRoutes from '../routes/location.routes.js';
 import { errorHandler } from '../utils/helper.js';
 
 const app = express();
@@ -45,5 +46,6 @@ app.use(errorHandler);
 // Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/location', locationRoutes);
 
 export default app;

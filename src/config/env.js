@@ -33,7 +33,7 @@ export default {
   port: env.PORT,
   jwt: {
     access_secret: env.JWT_ACCESS_SECRET,
-    accessExpirationMinutes: 30,
+    accessExpirationMinutes: env.JWT_ACCESS_EXPIRATION_MINUTES,
   },
   cloudinary: {
     cloud_name: env.CLOUDINARY_CLOUD_NAME,

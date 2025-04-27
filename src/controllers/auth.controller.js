@@ -1,4 +1,4 @@
-import { formatError, generateSlug, upload_to_cloudinary } from '../utils/helper.js';
+import { formatError, upload_to_cloudinary } from '../utils/helper.js';
 import { register_user, updateUserSchema } from '../validations/index.js';
 import AppError from '../utils/AppError.js';
 import { BAD_REQUEST, CREATED, INTERNAL_SERVER, OK } from '../constants/index.js';
@@ -9,10 +9,10 @@ import {
   getUserDetails,
   saveUser,
   update_user,
+  update_user_location,
 } from '../services/auth.services.js';
 import { generateToken } from '../utils/user.js';
 import env from '../config/env.js';
-import { getLocationBySlug, save_state } from '../services/location.services.js';
 
 export const register = async (req, res, next) => {
   try {
@@ -96,8 +96,16 @@ export const register = async (req, res, next) => {
 
 export const update_profile = async (req, res, next) => {
   try {
-    const { first_name, last_name, phone_number, email, state, mandal, district, constituency } =
-      updateUserSchema.parse(req.body);
+    const {
+      first_name,
+      last_name,
+      phone_number,
+      email,
+      state_id,
+      mandal_id,
+      district_id,
+      constituency_id,
+    } = updateUserSchema.parse(req.body);
     const { user_id } = req.user;
     let image_url = null;
 
@@ -113,24 +121,11 @@ export const update_profile = async (req, res, next) => {
     }
 
     const location_payload = {
-      state: state,
-      district: district,
-      mandal: mandal,
-      constituency: constituency,
+      state_id,
+      district_id,
+      mandal_id,
+      constituency_id,
     };
-
-    const location_slug = generateSlug(location_payload);
-
-    const existing_location = await getLocationBySlug(location_slug, 'location_slug');
-
-    if (!existing_location) {
-      const location = {
-        ...location_payload,
-        location_slug: location_slug,
-      };
-
-      await save_state(location);
-    }
 
     const user_payload = {
       first_name: first_name,
@@ -139,18 +134,19 @@ export const update_profile = async (req, res, next) => {
       email: email,
       profile_image: image_url,
     };
-
-    update_user(user.id, user_payload)
-      .then((saved_user) => {
-        return res.status(CREATED).json({
-          message: 'User updated successfully',
-          data: saved_user,
+    update_user_location(user.id, location_payload).then(async () => {
+      await update_user(user.id, user_payload)
+        .then((saved_user) => {
+          return res.status(CREATED).json({
+            message: 'User updated successfully',
+            data: saved_user,
+          });
+        })
+        .catch((error) => {
+          logger.error('Error while updating user', error);
+          return next(new AppError('Something went wrong', INTERNAL_SERVER));
         });
-      })
-      .catch((error) => {
-        logger.error('Error while updating user', error);
-        return next(new AppError('Something went wrong', INTERNAL_SERVER));
-      });
+    });
   } catch (error) {
     if (error instanceof Error) {
       const parsedError = formatError(error);

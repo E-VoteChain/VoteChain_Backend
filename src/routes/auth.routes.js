@@ -10,7 +10,7 @@ const upload = multer({
 const router = express.Router();
 
 router.post('/login', register);
-router.put('/update', verify_token, upload.single('profile_image'), update_profile);
+router.put('/update_profile', verify_token, upload.single('profile_image'), update_profile);
 router.get('/jwt', verify_token, decode_jwt);
 router.post('/logout', verify_token, logout);
 

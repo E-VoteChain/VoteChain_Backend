@@ -26,9 +26,10 @@ enum Election_level {
 }
 
 model State {
-  id       String     @id @default(auto()) @map("_id") @db.ObjectId
-  name     String
-  District District[]
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  District     District[]
+  UserLocation UserLocation[]
 
   @@index([name], name: "state_name")
   @@map("states")
@@ -38,7 +39,7 @@ model District {
   id       String   @id @default(auto()) @map("_id") @db.ObjectId
   name     String
   state_id String   @db.ObjectId
-  states   State    @relation(fields: [state_id], references: [id])
+  states   State    @relation(fields: [state_id], references: [id], onDelete: Cascade)
   Mandal   Mandal[]
 
   @@index([name], name: "district_name")
@@ -50,7 +51,7 @@ model Mandal {
   id           String         @id @default(auto()) @map("_id") @db.ObjectId
   name         String
   district_id  String         @db.ObjectId
-  district     District       @relation(fields: [district_id], references: [id])
+  district     District       @relation(fields: [district_id], references: [id], onDelete: Cascade)
   Constituency Constituency[]
 
   @@index([name], name: "mandal_name")
@@ -62,7 +63,7 @@ model Constituency {
   id        String @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   mandal_id String @db.ObjectId
-  mandal    Mandal @relation(fields: [mandal_id], references: [id])
+  mandal    Mandal @relation(fields: [mandal_id], references: [id], onDelete: Cascade)
 
   @@index([name], name: "constituency_name")
   @@index([mandal_id], name: "constituency_mandal_id")
@@ -108,24 +109,48 @@ model Candidate {
   party_id    String? @db.ObjectId
 
   Election Election @relation(fields: [election_id], references: [id], onDelete: Cascade)
-  Party    Party?   @relation(fields: [party_id], references: [id])
+  Party    Party?   @relation(fields: [party_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }
 
 model User {
-  id             String        @id @default(auto()) @map("_id") @db.ObjectId
-  wallet_address String        @unique
-  is_verified    Boolean       @default(false)
-  has_voted      Boolean       @default(false)
-  election_id    String?       @db.ObjectId
-  role           Role          @default(USER)
-  status         Status        @default(PENDING)
-  Election       Election?     @relation(fields: [election_id], references: [id])
-  created_at     DateTime      @default(now())
-  updated_at     DateTime      @updatedAt
-  UserDetails    UserDetails[]
+  id             String  @id @default(auto()) @map("_id") @db.ObjectId
+  wallet_address String  @unique
+  is_verified    Boolean @default(false)
+  has_voted      Boolean @default(false)
+  election_id    String? @db.ObjectId
+  role           Role    @default(USER)
+  status         Status  @default(PENDING)
+
+  Election     Election?      @relation(fields: [election_id], references: [id],onDelete: Cascade)
+  UserDetails  UserDetails[]
+  UserLocation UserLocation[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model UserLocation {
+  id              String @id @default(auto()) @map("_id") @db.ObjectId
+  state_id        String @db.ObjectId
+  district_id     String @db.ObjectId
+  mandal_id       String @db.ObjectId
+  constituency_id String @db.ObjectId
+  user_id         String @db.ObjectId
+
+  User  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  State State @relation(fields: [state_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([state_id], name: "user_location_state_id")
+  @@index([district_id], name: "user_location_district_id")
+  @@index([mandal_id], name: "user_location_mandal_id")
+  @@index([constituency_id], name: "user_location_constituency_id")
+  @@index([user_id], name: "user_location_user_id")
 }
 
 model UserDetails {
@@ -136,7 +161,9 @@ model UserDetails {
   phone_number  String
   profile_image String
   user_id       String @db.ObjectId
-  User          User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  User       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
 }
 
 model Vote {

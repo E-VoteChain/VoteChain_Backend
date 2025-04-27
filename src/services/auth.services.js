@@ -53,7 +53,7 @@ export const update_user = async (id, payload) => {
   const { first_name, last_name, phone_number, email, profile_image } = payload;
   try {
     const user = await prisma.user.update({
-      where: { _id: id },
+      where: { id: id },
       data: {
         UserDetails: {
           create: {
@@ -68,6 +68,32 @@ export const update_user = async (id, payload) => {
     });
     return user;
   } catch (err) {
+    console.log('error', err);
     return err;
+  }
+};
+
+export const update_user_location = async (_id, payload) => {
+  const { state_id, district_id, mandal_id, constituency_id } = payload;
+
+  try {
+    const user = await prisma.user.update({
+      where: {
+        id: _id,
+      },
+      data: {
+        UserLocation: {
+          create: {
+            state_id: state_id,
+            district_id: district_id,
+            mandal_id: mandal_id,
+            constituency_id: constituency_id,
+          },
+        },
+      },
+    });
+    return user;
+  } catch (error) {
+    return error;
   }
 };

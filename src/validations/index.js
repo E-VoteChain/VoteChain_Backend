@@ -1,4 +1,9 @@
 import * as z from 'zod';
+import { ObjectId } from 'mongodb'; // Add this line
+
+const zodObjectId = z.string().refine((val) => ObjectId.isValid(val), {
+  message: 'Invalid ObjectId',
+});
 
 export const register_user = z.object({
   wallet_address: z.string().nonempty('Wallet address is required'),
@@ -40,34 +45,10 @@ export const updateUserSchema = z.object({
       message: 'Email must be less than 50 characters',
     }
   ),
-  state: z
-    .string()
-    .min(1, {
-      message: 'State is required',
-    })
-    .trim()
-    .toLowerCase(),
-  district: z
-    .string()
-    .min(1, {
-      message: 'District is required',
-    })
-    .trim()
-    .toLowerCase(),
-  mandal: z
-    .string()
-    .min(1, {
-      message: 'Mandal is required',
-    })
-    .trim()
-    .toLowerCase(),
-  constituency: z
-    .string()
-    .min(1, {
-      message: 'Constituency is required',
-    })
-    .trim()
-    .toLowerCase(),
+  state_id: zodObjectId,
+  district_id: zodObjectId,
+  mandal_id: zodObjectId,
+  constituency_id: zodObjectId,
 });
 
 export const approve_user_schema = z.object({

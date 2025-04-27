@@ -7,12 +7,14 @@ import {
   getUserById,
   getUserByWalletAddress,
   getUserDetails,
+  getUserLocation,
   saveUser,
   update_user,
   update_user_location,
 } from '../services/auth.services.js';
 import { generateToken } from '../utils/user.js';
 import env from '../config/env.js';
+import { getLocationByStateId } from '../services/location.services.js';
 
 export const register = async (req, res, next) => {
   try {
@@ -163,22 +165,16 @@ export const decode_jwt = async (req, res, next) => {
   try {
     const { user_id, wallet_address, role, status } = req.user;
 
-    const userDetails = await getUserDetails(user_id, 'first_name last_name phone_number email');
-
     const user = {
-      ...userDetails,
-      wallet_address,
-      role,
-      status,
+      user_id: user_id,
+      wallet_address: wallet_address,
+      role: role === 'ADMIN' ? 'admin' : 'user',
+      status: status,
     };
-
-    return res.status(OK).json({
-      message: 'User decoded successfully',
-      data: user,
-    });
+    return res.status(OK).json(user);
   } catch (error) {
     console.log('error', error);
-    logger.error('Error while updating user', error);
+    logger.error('Error while decoding JWT', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
 };
@@ -191,6 +187,65 @@ export const logout = async (req, res, next) => {
     });
   } catch (error) {
     logger.error('Error while logging out user', error);
+    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+  }
+};
+
+export const get_user = async (req, res, next) => {
+  try {
+    const { user_id } = req.user;
+    const user = await getUserById(user_id, 'id status is_verified');
+    const userDetails = await getUserDetails(
+      user_id,
+      'first_name last_name phone_number email profile_image'
+    );
+
+    const location = await getUserLocation(
+      user_id,
+      'state_id district_id mandal_id constituency_id'
+    );
+
+    const userLocation = await getLocationByStateId({
+      state_id: location.state_id,
+      district_id: location.district_id,
+      mandal_id: location.mandal_id,
+      constituency_id: location.constituency_id,
+    });
+
+    const state = {
+      id: userLocation.id,
+      name: userLocation.name,
+    };
+
+    const district = {
+      id: userLocation.District[0].id,
+      name: userLocation.District[0].name,
+    };
+
+    const mandal = {
+      id: userLocation.District[0].Mandal[0].id,
+      name: userLocation.District[0].Mandal[0].name,
+    };
+    const constituency = {
+      id: userLocation.District[0].Mandal[0].Constituency[0].id,
+      name: userLocation.District[0].Mandal[0].Constituency[0].name,
+    };
+
+    const userData = {
+      ...user,
+      ...userDetails,
+      ...userLocation,
+      location: {
+        state: state,
+        district: district,
+        mandal: mandal,
+        constituency: constituency,
+      },
+    };
+
+    return res.status(OK).json(userData);
+  } catch (error) {
+    logger.error('Error while getting user', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
 };

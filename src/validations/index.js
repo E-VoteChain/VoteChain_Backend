@@ -81,3 +81,7 @@ export const location_slug_validation = z.object({
   mandal: z.string().nonempty('Mandal is required').trim().toLowerCase(),
   constituency: z.string().nonempty('Constituency is required').trim().toLowerCase(),
 });
+
+export const validateUserId = z.object({
+  user_id: zodObjectId,
+});

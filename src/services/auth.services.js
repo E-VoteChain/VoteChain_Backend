@@ -26,7 +26,14 @@ export const getUserDetails = async (id, fields = '') => {
       : undefined,
   });
 };
-
+export const getUserLocation = async (id, fields = '') => {
+  return await prisma.userLocation.findUnique({
+    where: { user_id: id },
+    select: fields
+      ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
+      : undefined,
+  });
+};
 export const getUserByEmail = async (email, fields = '') => {
   const user = await prisma.user.findUnique({
     where: { email: email },

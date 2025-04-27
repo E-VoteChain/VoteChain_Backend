@@ -138,7 +138,7 @@ model UserLocation {
   district_id     String @db.ObjectId
   mandal_id       String @db.ObjectId
   constituency_id String @db.ObjectId
-  user_id         String @db.ObjectId
+  user_id         String @unique @db.ObjectId
 
   User  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
   State State @relation(fields: [state_id], references: [id], onDelete: Cascade)
@@ -146,12 +146,10 @@ model UserLocation {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  @@unique([state_id, district_id, mandal_id, constituency_id, user_id], name: "user_location_unique")
   @@index([state_id], name: "user_location_state_id")
   @@index([district_id], name: "user_location_district_id")
   @@index([mandal_id], name: "user_location_mandal_id")
   @@index([constituency_id], name: "user_location_constituency_id")
-  @@index([user_id], name: "user_location_user_id")
 }
 
 model UserDetails {

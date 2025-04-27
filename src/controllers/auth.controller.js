@@ -164,11 +164,10 @@ export const update_profile = async (req, res, next) => {
 export const decode_jwt = async (req, res, next) => {
   try {
     const { user_id, wallet_address, role, status } = req.user;
-
     const user = {
       user_id: user_id,
       wallet_address: wallet_address,
-      role: role === 'ADMIN' ? 'admin' : 'user',
+      role: role === 'admin' ? 'admin' : 'user',
       status: status,
     };
     return res.status(OK).json(user);

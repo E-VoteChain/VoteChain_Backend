@@ -20,7 +20,7 @@ export const getUserByWalletAddress = async (wallet_address, fields = '') => {
 
 export const getUserDetails = async (id, fields = '') => {
   return await prisma.userDetails.findUnique({
-    where: { id: id },
+    where: { user_id: id },
     select: fields
       ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
       : undefined,

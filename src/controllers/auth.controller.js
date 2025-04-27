@@ -84,6 +84,7 @@ export const register = async (req, res, next) => {
         return next(new AppError('Something went wrong', INTERNAL_SERVER));
       });
   } catch (error) {
+    console.log('error', error);
     if (error instanceof Error) {
       const error = formatError(error);
       return next(new AppError(error, BAD_REQUEST));

@@ -124,7 +124,7 @@ model User {
   role           Role    @default(USER)
   status         Status  @default(PENDING)
 
-  Election     Election?      @relation(fields: [election_id], references: [id],onDelete: Cascade)
+  Election     Election?      @relation(fields: [election_id], references: [id], onDelete: Cascade)
   UserDetails  UserDetails[]
   UserLocation UserLocation[]
 
@@ -146,6 +146,7 @@ model UserLocation {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  @@unique([state_id, district_id, mandal_id, constituency_id, user_id], name: "user_location_unique")
   @@index([state_id], name: "user_location_state_id")
   @@index([district_id], name: "user_location_district_id")
   @@index([mandal_id], name: "user_location_mandal_id")
@@ -160,7 +161,7 @@ model UserDetails {
   email         String
   phone_number  String
   profile_image String
-  user_id       String @db.ObjectId
+  user_id       String @unique @db.ObjectId
 
   User       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   created_at DateTime @default(now())

@@ -23,15 +23,16 @@ import prisma from '../config/db.js';
 export const paginate = async (model, filter = {}, options = {}) => {
   const { sortBy, limit = 10, page = 1, populate } = options;
 
-  let orderBy = {};
+  let orderBy;
   if (sortBy) {
     const sortingCriteria = sortBy.split(',').map((sortOption) => {
       const [field, direction] = sortOption.split(':');
       return { [field]: direction === 'desc' ? 'desc' : 'asc' };
     });
-    orderBy = sortingCriteria;
+
+    orderBy = sortingCriteria.length === 1 ? sortingCriteria[0] : sortingCriteria;
   } else {
-    orderBy = { created_at: 'desc' };
+    orderBy = { createdAt: 'desc' };
   }
 
   const skip = (page - 1) * limit;
@@ -39,20 +40,14 @@ export const paginate = async (model, filter = {}, options = {}) => {
 
   const query = {
     where: filter,
-    skip: skip,
-    take: take,
-    orderBy: orderBy,
+    skip,
+    take,
+    orderBy,
   };
+  console.log(' query', query);
 
   if (populate) {
-    query.include = populate.split(',').reduce((acc, field) => {
-      const fieldParts = field.split('.');
-      const lastPart = fieldParts.pop();
-      const path = fieldParts.join('.');
-
-      acc[lastPart] = { include: path ? { [path]: true } : {} };
-      return acc;
-    }, {});
+    query.include = buildNestedInclude(populate);
   }
 
   const [totalResults, results] = await Promise.all([
@@ -69,4 +64,38 @@ export const paginate = async (model, filter = {}, options = {}) => {
     totalPages,
     totalResults,
   };
+};
+
+/**
+ * Helper function to build nested `include` object for Prisma.
+ * @param {string} populateString - Comma-separated list of relations (e.g., 'profile.address')
+ * @returns {Object} - Nested include object
+ */
+const buildNestedInclude = (populateString) => {
+  const fields = populateString.split(',');
+  const include = {};
+
+  for (const field of fields) {
+    const parts = field.trim().split('.');
+    let current = include;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+
+      if (!current[part]) {
+        current[part] = {};
+      }
+
+      if (i === parts.length - 1) {
+        current[part] = true;
+      } else {
+        if (!current[part].include) {
+          current[part].include = {};
+        }
+        current = current[part].include;
+      }
+    }
+  }
+
+  return include;
 };

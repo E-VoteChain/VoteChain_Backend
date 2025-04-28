@@ -16,6 +16,7 @@ enum Status {
   PENDING
   APPROVED
   REJECTED
+  INCOMPLETE
 }
 
 enum Election_level {
@@ -122,7 +123,7 @@ model User {
   has_voted      Boolean @default(false)
   election_id    String? @db.ObjectId
   role           Role    @default(USER)
-  status         Status  @default(PENDING)
+  status         Status  @default(INCOMPLETE)
 
   Election     Election?      @relation(fields: [election_id], references: [id], onDelete: Cascade)
   UserDetails  UserDetails[]

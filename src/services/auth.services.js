@@ -62,6 +62,7 @@ export const update_user = async (id, payload) => {
     const user = await prisma.user.update({
       where: { id: id },
       data: {
+        status: 'PENDING',
         UserDetails: {
           create: {
             first_name: first_name,

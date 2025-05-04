@@ -4,30 +4,55 @@ import { cloudinary } from '../config/cloudinary.js';
 import { Readable } from 'stream';
 import * as path from 'path';
 import ejs from 'ejs';
-import AppError from './AppError.js';
+import { AppError } from './AppError.js';
 import { BAD_REQUEST, INTERNAL_SERVER } from '../constants/index.js';
 import logger from '../config/logger.js';
-import { location_slug_validation } from '../validations/index.js';
 
+/**
+ * Formats errors, especially validation errors (like Zod).
+ * @param {Error} error
+ * @returns {Object} Formatted error object.
+ */
 export const formatError = (error) => {
-  let errors = {};
-  console.log('error', error);
-  error.errors.map((err) => {
-    errors[err.path?.[0]] = err.message;
-  });
-  return errors;
+  if (error.name === 'ZodError' && Array.isArray(error.errors)) {
+    const formatted = {};
+    error.errors.forEach((e) => {
+      const path = e.path.length > 0 ? e.path.join('.') : 'root'; // If the path is empty, label it as 'root'
+      formatted[path] = e.message;
+    });
+    return formatted;
+  }
+
+  if (error instanceof Error) {
+    return { message: error.message };
+  }
+
+  return { message: 'Unknown error occurred' };
 };
 
-export const generateId = () => {
-  return uuidv4();
-};
+/**
+ * Generates a UUID v4 string.
+ * @returns {string}
+ */
+export const generateId = () => uuidv4();
 
+/**
+ * Renders an EJS email template with the given payload.
+ * @param {string} fileName
+ * @param {Object} payload
+ * @returns {Promise<string>} Rendered HTML string.
+ */
 export const renderEmailEjs = async (fileName, payload) => {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const html = await ejs.renderFile(path.join(__dirname, `../views/${fileName}.ejs`), payload);
   return html;
 };
 
+/**
+ * Uploads a file buffer to Cloudinary.
+ * @param {Buffer} fileBuffer
+ * @returns {Promise<string>} URL of uploaded file.
+ */
 export const upload_to_cloudinary = (fileBuffer) => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream({ folder: 'votechain' }, (error, result) => {
@@ -42,12 +67,10 @@ export const upload_to_cloudinary = (fileBuffer) => {
   });
 };
 
-export const generateSlug = (payload) => {
-  const { state, district, mandal, constituency } = location_slug_validation.parse(payload);
-
-  return `${state}-${district}-${mandal}-${constituency}`;
-};
-
+/**
+ * Validates user status. Throws AppError if user is missing or has terminal status.
+ * @param {Object|null} user
+ */
 export const validateUserStatus = (user) => {
   if (!user) {
     throw new AppError('User not found', BAD_REQUEST);
@@ -63,23 +86,39 @@ export const validateUserStatus = (user) => {
   }
 };
 
+/**
+ * Centralized error handling middleware.
+ * @param {Error} err
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {Function} next
+ */
 export const errorHandler = (err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
+  const statusCode = err.statusCode || INTERNAL_SERVER;
+  const message = err.message || 'Something went wrong';
 
-  logger.error(`${req.method} ${req.originalUrl} - ${err.message}`, {
+  const logDetails = {
+    method: req.method,
+    url: req.originalUrl,
     statusCode,
     stack: err.stack,
     errors: err.errors || null,
-  });
+  };
+
+  if (err.isOperational) {
+    logger.error(`${req.method} ${req.originalUrl} - ${message}`, logDetails);
+  } else {
+    logger.error('Critical Error:', logDetails);
+  }
 
   if (err instanceof AppError) {
     return res.status(statusCode).json({
-      message: err.message,
+      message,
       ...(err.errors && { errors: err.errors }),
     });
   }
 
-  if (err.errors && Array.isArray(err.errors)) {
+  if (err.name === 'ZodError' && Array.isArray(err.errors)) {
     return res.status(BAD_REQUEST).json({
       message: 'Validation failed',
       errors: formatError(err),

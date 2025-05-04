@@ -134,12 +134,13 @@ model User {
 }
 
 model UserLocation {
-  id              String @id @default(auto()) @map("_id") @db.ObjectId
-  state_id        String @db.ObjectId
-  district_id     String @db.ObjectId
-  mandal_id       String @db.ObjectId
-  constituency_id String @db.ObjectId
-  user_id         String @unique @db.ObjectId
+  id              String  @id @default(auto()) @map("_id") @db.ObjectId
+  state_id        String  @db.ObjectId
+  district_id     String  @db.ObjectId
+  mandal_id       String  @db.ObjectId
+  constituency_id String  @db.ObjectId
+  user_id         String  @unique @db.ObjectId
+  rejected_reason String?
 
   User  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
   State State @relation(fields: [state_id], references: [id], onDelete: Cascade)
@@ -154,13 +155,15 @@ model UserLocation {
 }
 
 model UserDetails {
-  id            String @id @default(auto()) @map("_id") @db.ObjectId
-  first_name    String
-  last_name     String
-  email         String
-  phone_number  String
-  profile_image String
-  user_id       String @unique @db.ObjectId
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  first_name      String
+  last_name       String
+  email           String
+  phone_number    String
+  profile_image   String
+  aadhar_image    String
+  rejected_fields String[] @default([])
+  user_id         String   @unique @db.ObjectId
 
   User       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   created_at DateTime @default(now())

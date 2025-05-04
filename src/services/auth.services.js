@@ -1,95 +1,91 @@
 import prisma from '../config/db.js';
+import { AppError } from '../utils/AppError.js';
+import { BAD_REQUEST, INTERNAL_SERVER } from '../constants/index.js';
+import { PrismaClientValidationError } from '@prisma/client/runtime/library';
 
-export const getUserById = async (id, fields = '') => {
-  return await prisma.user.findUnique({
-    where: { id: id },
-    select: fields
-      ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
-      : undefined,
-  });
-};
-
-export const getUserByWalletAddress = async (wallet_address, fields = '') => {
-  return await prisma.user.findUnique({
-    where: { wallet_address: wallet_address },
-    select: fields
-      ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
-      : undefined,
-  });
-};
-
-export const getUserDetails = async (id, fields = '') => {
-  return await prisma.userDetails.findUnique({
-    where: { user_id: id },
-    select: fields
-      ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
-      : undefined,
-  });
-};
-export const getUserLocation = async (id, fields = '') => {
-  return await prisma.userLocation.findUnique({
-    where: { user_id: id },
-    select: fields
-      ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
-      : undefined,
-  });
-};
-export const getUserByEmail = async (email, fields = '') => {
-  const user = await prisma.user.findUnique({
-    where: { email: email },
-    select: fields
-      ? fields.split(' ').reduce((acc, field) => ({ ...acc, [field]: true }), {})
-      : undefined,
-  });
-  return user;
-};
-
-export const saveUser = async (payload) => {
-  console.log('Payload', payload);
+export const getUserById = async (id, select = {}) => {
   try {
-    const user = await prisma.user.create({
-      data: payload,
-    });
-    return user;
-  } catch (err) {
-    return err;
+    return await prisma.user.findUnique({ where: { id }, select });
+  } catch (error) {
+    throw new AppError('Failed to get user by ID', INTERNAL_SERVER, error);
   }
 };
 
-export const update_user = async (id, payload) => {
-  const { first_name, last_name, phone_number, email, profile_image } = payload;
+export const getUserByWalletAddress = async (wallet_address, select = {}) => {
   try {
-    const user = await prisma.user.update({
-      where: { id: id },
+    return await prisma.user.findUnique({ where: { wallet_address }, select });
+  } catch (error) {
+    throw new AppError('Failed to get user by wallet address', INTERNAL_SERVER, error);
+  }
+};
+
+export const getUserDetails = async (id, select = {}) => {
+  try {
+    return await prisma.userDetails.findUnique({ where: { user_id: id }, select });
+  } catch (error) {
+    throw new AppError('Failed to get user details', INTERNAL_SERVER, error);
+  }
+};
+
+export const getUserLocation = async (id, select = {}) => {
+  try {
+    return await prisma.userLocation.findUnique({ where: { user_id: id }, select });
+  } catch (error) {
+    throw new AppError('Failed to get user location', INTERNAL_SERVER, error);
+  }
+};
+
+export const getUserByEmail = async (email, select = {}) => {
+  try {
+    return await prisma.user.findUnique({ where: { email }, select });
+  } catch (error) {
+    throw new AppError('Failed to get user by email', INTERNAL_SERVER, error);
+  }
+};
+
+export const saveUser = async (payload) => {
+  try {
+    return await prisma.user.create({ data: payload });
+  } catch (error) {
+    // Handle Prisma client validation errors more explicitly
+    if (error instanceof PrismaClientValidationError) {
+      if (error.code === 'P2002') {
+        throw new AppError('User already exists', BAD_REQUEST, error); // More specific message
+      }
+    }
+    // For other errors, return a generic failure message
+    throw new AppError('Failed to save user', INTERNAL_SERVER, error);
+  }
+};
+
+export const updateUser = async (id, payload) => {
+  const {
+    first_name,
+    last_name,
+    phone_number,
+    email,
+    profile_image,
+    state_id,
+    district_id,
+    mandal_id,
+    constituency_id,
+    aadhar_image,
+  } = payload;
+  try {
+    return await prisma.user.update({
+      where: { id },
       data: {
         status: 'PENDING',
         UserDetails: {
           create: {
-            first_name: first_name,
-            last_name: last_name,
-            phone_number: phone_number,
-            email: email,
-            profile_image: profile_image,
+            first_name,
+            last_name,
+            phone_number,
+            email,
+            profile_image,
+            aadhar_image,
           },
         },
-      },
-    });
-    return user;
-  } catch (err) {
-    console.log('error', err);
-    return err;
-  }
-};
-
-export const update_user_location = async (_id, payload) => {
-  const { state_id, district_id, mandal_id, constituency_id } = payload;
-
-  try {
-    const user = await prisma.user.update({
-      where: {
-        id: _id,
-      },
-      data: {
         UserLocation: {
           create: {
             state_id: state_id,
@@ -100,8 +96,35 @@ export const update_user_location = async (_id, payload) => {
         },
       },
     });
-    return user;
   } catch (error) {
-    return error;
+    console.log('Error', error);
+    if (error instanceof PrismaClientValidationError) {
+      if (error.code === 'P2002') {
+        throw new AppError('User with this information already exists', BAD_REQUEST, error);
+      }
+    }
+    throw new AppError('Failed to update user', INTERNAL_SERVER, error);
+  }
+};
+
+export const updateUserLocation = async (_id, payload) => {
+  const { state_id, district_id, mandal_id, constituency_id } = payload;
+  try {
+    return await prisma.user.update({
+      where: { id: _id },
+      data: {
+        UserLocation: {
+          create: {
+            state_id,
+            district_id,
+            mandal_id,
+            constituency_id,
+          },
+        },
+      },
+    });
+  } catch (error) {
+    console.log('error', error);
+    throw new AppError('Failed to update user location', INTERNAL_SERVER, error);
   }
 };

@@ -1,65 +1,66 @@
 import * as z from 'zod';
-import { ObjectId } from 'mongodb'; // Add this line
+import { ObjectId } from 'mongodb';
 
 const zodObjectId = z.string().refine((val) => ObjectId.isValid(val), {
   message: 'Invalid ObjectId',
 });
 
-export const register_user = z.object({
-  wallet_address: z.string().nonempty('Wallet address is required'),
+export const registerUser = z.object({
+  wallet_address: z.string().transform((data, ctx) => {
+    if (data.length < 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Invalid wallet address',
+      });
+      return z.NEVER;
+    }
+    return data;
+  }),
 });
 
 export const updateUserSchema = z.object({
   first_name: z
-    .string({
-      required_error: 'First name is required',
-    })
-    .min(2, {
-      message: 'First name must be at least 2 characters long',
-    }),
-  last_name: z
-    .string({
-      required_error: 'Last name is required',
-    })
-    .min(2, {
-      message: 'Last name must be at least 2 characters long',
-    }),
+    .string()
+    .trim()
+    .min(2, { message: 'First name must be at least 2 characters long' }),
+  last_name: z.string().trim().min(2, { message: 'Last name must be at least 2 characters long' }),
   phone_number: z
-    .string({
-      required_error: 'Phone number is required',
-    })
-    .min(10, {
-      message: 'Phone number must be at least 10 digits',
-    })
-    .max(15, {
-      message: 'Phone number must be at most 15 digits',
-    })
-    .regex(/^\d+$/, {
-      message: 'Phone number must contain only digits',
+    .string()
+    .trim()
+    .regex(/^\d{10,15}$/, {
+      message: 'Phone number must be between 10 and 15 digits and contain only digits',
     }),
-  email: z.string().refine(
-    (val) => {
-      return !val || val.length <= 50;
-    },
-    {
-      message: 'Email must be less than 50 characters',
-    }
-  ),
+  email: z
+    .string()
+    .trim()
+    .email({ message: 'Invalid email format' })
+    .max(50, { message: 'Email must be less than or equal to 50 characters' }),
   state_id: zodObjectId,
   district_id: zodObjectId,
   mandal_id: zodObjectId,
   constituency_id: zodObjectId,
 });
 
-export const approve_user_schema = z.object({
-  wallet_address: z.string(),
+export const approveUserSchema = z.object({
+  user_id: zodObjectId,
 });
 
-export const reject_user_schema = z.object({
-  wallet_address: z.string(),
+export const rejectUserSchema = z.object({
+  user_id: zodObjectId,
+  reason: z.string().min(10, {
+    message: 'Reason must be at least 10 characters long',
+  }),
+  rejected_fields: z
+    .array(z.string())
+    .min(1, {
+      message: 'At least one field must be specified for rejection',
+    })
+    .max(5, {
+      message: 'You can reject up to 5 fields at a time',
+    }),
 });
 
-export const create_election_schema = z.object({
+export const createElectionSchema = z.object({
   election_name: z.string().nonempty('Election name is required'),
   election_start_time: z
     .string()
@@ -73,13 +74,6 @@ export const create_election_schema = z.object({
     .refine((val) => !isNaN(Date.parse(val)), {
       message: 'Invalid date format',
     }),
-});
-
-export const location_slug_validation = z.object({
-  state: z.string().nonempty('State is required').trim().toLowerCase(),
-  district: z.string().nonempty('District is required').trim().toLowerCase(),
-  mandal: z.string().nonempty('Mandal is required').trim().toLowerCase(),
-  constituency: z.string().nonempty('Constituency is required').trim().toLowerCase(),
 });
 
 export const validateUserId = z.object({

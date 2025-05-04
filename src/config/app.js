@@ -3,7 +3,6 @@ import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
-
 import { fileURLToPath } from 'url';
 import * as path from 'path';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -13,6 +12,7 @@ import authRoutes from '../routes/auth.routes.js';
 import adminRoutes from '../routes/admin.routes.js';
 import locationRoutes from '../routes/location.routes.js';
 import { errorHandler } from '../utils/helper.js';
+import env from './env.js';
 
 const app = express();
 
@@ -23,13 +23,13 @@ app.use(morgan('dev'));
 
 app.use(
   cors({
-    origin: 'http://localhost:5173',
-    credentials: true,
+    origin: env.cors.origin || 'http://localhost:5173',
+    credentials: env.cors.credentials,
   })
 );
+
 app.use(cookieParser());
 
-// view engine
 app.set('view engine', 'ejs');
 app.set('views', path.resolve(__dirname, '../views'));
 
@@ -37,15 +37,17 @@ app.get('/', (req, res) => {
   return res.render('home');
 });
 
-app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.url}`);
-  next();
-});
+if (env.env !== 'production') {
+  app.use((req, res, next) => {
+    logger.info(`${req.method} ${req.originalUrl}`);
+    next();
+  });
+}
 
-app.use(errorHandler);
-// Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/location', locationRoutes);
+
+app.use(errorHandler);
 
 export default app;

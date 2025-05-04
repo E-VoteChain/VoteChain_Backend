@@ -1,77 +1,64 @@
 import { formatError, validateUserStatus } from '../utils/helper.js';
-import AppError from '../utils/AppError.js';
+import { AppError } from '../utils/AppError.js';
 import { BAD_REQUEST, INTERNAL_SERVER, OK } from '../constants/index.js';
 import logger from '../config/logger.js';
-import { approve_user_schema } from '../validations/index.js';
+import { approveUserSchema, rejectUserSchema } from '../validations/index.js';
 import { getUserById } from '../services/auth.services.js';
 import { save_approve_user, save_reject_user } from '../services/admin.services.js';
 import { queryUsers } from '../services/user.services.js';
 import { getLocationByStateId } from '../services/location.services.js';
 import qs from 'qs';
-
-export const get_users = async (req, res, next) => {
-  try {
-    const { page = 1, limit = 10, sortBy, filter } = req.query;
-    const options = {
-      page: parseInt(page, 10),
-      limit: parseInt(limit, 10),
-      sort: sortBy,
-    };
-
-    const result = await queryUsers(filter, options);
-
-    return res.status(200).send({
-      page: result.page,
-      limit: result.limit,
-      total: result.total,
-      data: result,
-    });
-  } catch (error) {
-    logger.error('Error while creating user', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
-  }
-};
+import { successResponse, errorResponse } from '../utils/response.js';
 
 export const approve_user = async (req, res, next) => {
   try {
-    const { user_id } = approve_user_schema.parse(req.body);
+    const validatedFields = approveUserSchema.safeParse(req.body);
 
-    const user = await getUserById(user_id, 'wallet_address role status');
+    if (!validatedFields.success) {
+      console.log('validatedFields.error', validatedFields.error);
+      return next(new AppError('Invalid input data', BAD_REQUEST));
+    }
+
+    const { user_id } = validatedFields.data;
+
+    const user = await getUserById(user_id, {
+      wallet_address: true,
+      role: true,
+      status: true,
+    });
 
     validateUserStatus(user);
 
-    save_approve_user({ user_id }).then(async () => {
-      return res.sendStatus(OK);
-    });
+    await save_approve_user(user_id);
+    return successResponse(res, OK, 'User approved successfully');
   } catch (error) {
+    console.log('error', error);
     if (error instanceof Error) {
-      const error = formatError(error);
-      return next(new AppError(error, BAD_REQUEST));
+      const formattedError = formatError(error);
+      return next(new AppError(formattedError, BAD_REQUEST));
     }
 
-    logger.error('Error while creating user', error);
+    logger.error('Error while approving user', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
 };
 
 export const reject_user = async (req, res, next) => {
   try {
-    const { user_id } = approve_user_schema.parse(req.body);
+    const { user_id, reason } = rejectUserSchema.parse(req.body);
 
-    const user = await getUserById(user_id, 'wallet_address role status');
+    const user = await getUserById(user_id, {
+      wallet_address: true,
+      role: true,
+      status: true,
+    });
 
     validateUserStatus(user);
 
-    save_reject_user({ user_id }).then(async () => {
-      return res.sendStatus(OK);
-    });
+    await save_reject_user({ user_id, reason });
+    return successResponse(res, OK, 'User rejected successfully');
   } catch (error) {
-    if (error instanceof Error) {
-      const error = formatError(error);
-      return next(new AppError(error, BAD_REQUEST));
-    }
-
-    logger.error('Error while creating user', error);
+    logger.error('Error while rejecting user', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
 };
@@ -111,6 +98,7 @@ export const getPendingUsers = async (req, res, next) => {
       const userLocation = user.UserLocation[0];
 
       const formattedUser = {
+        id: user.id,
         wallet_address: user.wallet_address,
         status: user.status.toLowerCase(),
         first_name: userDetails.first_name,
@@ -118,6 +106,7 @@ export const getPendingUsers = async (req, res, next) => {
         email: userDetails.email,
         phone_number: userDetails.phone_number,
         profile_image: userDetails.profile_image,
+        aadhar_image: userDetails.aadhar_image,
       };
 
       const location = await getLocationByStateId({
@@ -143,15 +132,22 @@ export const getPendingUsers = async (req, res, next) => {
       usersWithLocation.push(formattedUser);
     }
 
-    res.json({
-      results: usersWithLocation,
-      page: options.page,
-      limit: options.limit,
-      totalPages: Math.ceil(result.totalResults / options.limit),
-      totalResults: result.totalResults,
-    });
+    return successResponse(
+      res,
+      usersWithLocation,
+      'Users with locations fetched successfully',
+      OK,
+      {
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+        totalResults: result.totalResults,
+      },
+      
+    );
   } catch (error) {
-    logger.error('Error while fetching users', error);
+    console.log('error', error);
+    // logger.error('Error while fetching users', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
   }
 };
@@ -162,13 +158,14 @@ export const create_election = async (req, res, next) => {
 
     // Validate the request body
     if (!election_name || !election_start_time || !election_end_time) {
-      return res.status(400).json({ error: 'All fields are required' });
+      return errorResponse(res, BAD_REQUEST, 'All fields are required');
     }
 
-    // Logic to create an election
-    // You can replace this with your actual implementation
+    // TODO: Add logic to create the election in the database
+    // For example, you might want to call a service function to save the election details
+    // await createElectionInDB({ election_name, election_start_time, election_end_time });
 
-    return res.status(201).json({ message: 'Election created successfully' });
+    return successResponse(res, OK, 'Election created successfully');
   } catch (error) {
     logger.error('Error while creating election', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));

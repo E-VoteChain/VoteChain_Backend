@@ -1,11 +1,11 @@
+import { INTERNAL_SERVER } from '../constants/index.js';
 import { paginate } from '../plugins/paginate.js';
+import { AppError } from '../utils/AppError.js';
 
 export const queryUsers = async (filter, options) => {
   try {
-    const users = await paginate('user', filter, options);
-    return users;
+    return await paginate('user', filter, options);
   } catch (error) {
-    console.error(error);
-    throw new Error('Error while querying users');
+    throw new AppError('Failed to query users', INTERNAL_SERVER, error);
   }
 };

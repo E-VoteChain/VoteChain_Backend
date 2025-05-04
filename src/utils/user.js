@@ -3,7 +3,7 @@ import env from '../config/env.js';
 
 export const generateToken = (userInfo) => {
   const access_token = jwt.sign(userInfo, env.jwt.access_secret, {
-    expiresIn: `${env.jwt.accessExpirationMinutes}d`,
+    expiresIn: `${env.jwt.accessExpirationDays}d`,
   });
 
   return access_token;

@@ -44,7 +44,6 @@ export const paginate = async (model, filter = {}, options = {}) => {
     take,
     orderBy,
   };
-  console.log(' query', query);
 
   if (populate) {
     query.include = buildNestedInclude(populate);

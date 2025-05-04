@@ -1,6 +1,6 @@
 import { formatError, upload_to_cloudinary } from '../utils/helper.js';
-import { register_user, updateUserSchema } from '../validations/index.js';
-import AppError from '../utils/AppError.js';
+import { registerUser, updateUserSchema } from '../validations/index.js';
+import { AppError } from '../utils/AppError.js';
 import { BAD_REQUEST, CREATED, INTERNAL_SERVER, OK } from '../constants/index.js';
 import logger from '../config/logger.js';
 import {
@@ -9,18 +9,34 @@ import {
   getUserDetails,
   getUserLocation,
   saveUser,
-  update_user,
-  update_user_location,
+  updateUser,
 } from '../services/auth.services.js';
 import { generateToken } from '../utils/user.js';
 import env from '../config/env.js';
 import { getLocationByStateId } from '../services/location.services.js';
+import { successResponse, errorResponse } from '../utils/response.js';
 
-export const register = async (req, res, next) => {
+export const register = async (req, res) => {
   try {
-    const { wallet_address } = register_user.parse(req.body);
+    const validated = registerUser.safeParse(req.body);
 
-    const existing_user = await getUserByWalletAddress(wallet_address, 'id wallet_address role');
+    if (!validated.success) {
+      return errorResponse(
+        res,
+        'Invalid wallet address',
+        formatError(validated.error),
+        BAD_REQUEST
+      );
+    }
+
+    const { wallet_address } = validated.data;
+
+    const existing_user = await getUserByWalletAddress(wallet_address, {
+      id: true,
+      wallet_address: true,
+      status: true,
+      role: true,
+    });
 
     if (existing_user) {
       const access_token = generateToken({
@@ -30,16 +46,7 @@ export const register = async (req, res, next) => {
         role: existing_user.role === 'ADMIN' ? 'admin' : 'user',
       });
 
-      let profile_completed = true;
-
-      const user_details = await getUserDetails(
-        existing_user.id,
-        'first_name last_name phone_number email'
-      );
-
-      if (user_details === null) {
-        profile_completed = false;
-      }
+      const profile_completed = existing_user.status !== 'INCOMPLETE';
 
       res.cookie('access_token', access_token, {
         httpOnly: true,
@@ -47,204 +54,185 @@ export const register = async (req, res, next) => {
         sameSite: 'strict',
       });
 
-      res.cookie('access_token', access_token, {
-        httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'strict',
-      });
-
-      return res.status(CREATED).json({
-        profile_completed: profile_completed,
-      });
+      return successResponse(res, { profile_completed }, 'User logged in successfully');
     }
 
-    const user = {
-      wallet_address: wallet_address,
-    };
+    const saved_user = await saveUser({ wallet_address });
 
-    saveUser(user)
-      .then(async (saved_user) => {
-        const access_token = generateToken({
-          user_id: saved_user.id,
-          wallet_address: saved_user.wallet_address,
-          role: saved_user.role === 'ADMIN' ? 'admin' : 'user',
-          status: saved_user.status,
-        });
+    const access_token = generateToken({
+      user_id: saved_user.id,
+      wallet_address: saved_user.wallet_address,
+      role: saved_user.role === 'ADMIN' ? 'admin' : 'user',
+      status: saved_user.status,
+    });
 
-        res.cookie('access_token', access_token, {
-          httpOnly: true,
-          secure: env.NODE_ENV === 'production',
-          sameSite: 'strict',
-        });
+    res.cookie('access_token', access_token, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
 
-        return res.status(CREATED).json({
-          profile_completed: false,
-        });
-      })
-      .catch((error) => {
-        logger.error('Error while creating user', error);
-        return next(new AppError('Something went wrong', INTERNAL_SERVER));
-      });
+    return successResponse(res, { profile_completed: false }, 'User registered successfully');
   } catch (error) {
-    console.log('error', error);
-    if (error instanceof Error) {
-      const error = formatError(error);
-      return next(new AppError(error, BAD_REQUEST));
-    }
-
-    logger.error('Error while creating user', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+    logger.error('Registration error:', error);
+    return errorResponse(res, 'Failed to register user', error.message, INTERNAL_SERVER);
   }
 };
 
 export const update_profile = async (req, res, next) => {
   try {
+    const validated = updateUserSchema.safeParse(req.body);
+    if (!validated.success) {
+      return next(new AppError(formatError(validated.error), BAD_REQUEST));
+    }
+
+    const { user_id } = req.user;
+
+    const user = await getUserById(user_id, {
+      id: true,
+    });
+    if (!user) return next(new AppError('User not found', BAD_REQUEST));
+
+    let profile_image = null;
+    if (req.files.profile_image[0].buffer && req.files.profile_image[0].mimetype) {
+      const mimeType = req.files.profile_image[0].mimetype;
+      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedMimeTypes.includes(mimeType)) {
+        return next(new AppError('Invalid image format', BAD_REQUEST));
+      }
+      if (req.files.profile_image[0].size > 5 * 1024 * 1024) {
+        return next(new AppError('Image size exceeds 5MB', BAD_REQUEST));
+      }
+      profile_image = await upload_to_cloudinary(req.files.profile_image[0].buffer);
+    }
+    let aadhar_image = null;
+    if (req.files.aadhar_image[0].buffer && req.files.aadhar_image[0].mimetype) {
+      const mimeType = req.files.aadhar_image[0].mimetype;
+      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedMimeTypes.includes(mimeType)) {
+        return next(new AppError('Invalid image format', BAD_REQUEST));
+      }
+      if (req.files.aadhar_image[0].size > 5 * 1024 * 1024) {
+        return next(new AppError('Image size exceeds 5MB', BAD_REQUEST));
+      }
+      aadhar_image = await upload_to_cloudinary(req.files.aadhar_image[0].buffer);
+    }
+
     const {
       first_name,
       last_name,
       phone_number,
       email,
       state_id,
-      mandal_id,
       district_id,
+      mandal_id,
       constituency_id,
-    } = updateUserSchema.parse(req.body);
-    const { user_id } = req.user;
-    let image_url = null;
+    } = validated.data;
 
-    const user = await getUserById(user_id, 'id');
-
-    if (!user) {
-      return next(new AppError('User not found', BAD_REQUEST));
-    }
-
-    if (req.file) {
-      const file_buffer = req.file.buffer;
-      image_url = await upload_to_cloudinary(file_buffer);
-    }
-
-    const location_payload = {
+    const user_payload = {
+      first_name,
+      last_name,
+      phone_number,
+      email,
+      profile_image: profile_image,
+      aadhar_image: aadhar_image,
       state_id,
       district_id,
       mandal_id,
       constituency_id,
     };
 
-    const user_payload = {
-      first_name: first_name,
-      last_name: last_name,
-      phone_number: phone_number,
-      email: email,
-      profile_image: image_url,
-    };
-    update_user_location(user.id, location_payload).then(async () => {
-      await update_user(user.id, user_payload)
-        .then((saved_user) => {
-          return res.status(CREATED).json({
-            message: 'User updated successfully',
-            data: saved_user,
-          });
-        })
-        .catch((error) => {
-          logger.error('Error while updating user', error);
-          return next(new AppError('Something went wrong', INTERNAL_SERVER));
-        });
-    });
-  } catch (error) {
-    if (error instanceof Error) {
-      const parsedError = formatError(error);
-      return next(new AppError(parsedError, BAD_REQUEST));
-    }
+    const updatedUser = await updateUser(user.id, user_payload);
 
-    logger.error('Error while updating user', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+    return successResponse(res, updatedUser, 'User updated successfully', CREATED);
+  } catch (error) {
+    logger.error('Error updating user profile:', error);
+    return next(new AppError('Failed to update user profile', INTERNAL_SERVER));
   }
 };
 
 export const decode_jwt = async (req, res, next) => {
   try {
     const { user_id, wallet_address, role, status } = req.user;
-    const user = {
-      user_id: user_id,
-      wallet_address: wallet_address,
+    return successResponse(res, {
+      user_id,
+      wallet_address,
       role: role === 'admin' ? 'admin' : 'user',
-      status: status,
-    };
-    return res.status(OK).json(user);
+      status,
+    });
   } catch (error) {
-    console.log('error', error);
-    logger.error('Error while decoding JWT', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+    logger.error('JWT decoding error:', error);
+    return next(new AppError('Failed to decode JWT', INTERNAL_SERVER));
   }
 };
 
 export const logout = async (req, res, next) => {
   try {
     res.clearCookie('access_token');
-    return res.status(OK).json({
-      message: 'User logged out successfully',
-    });
+    return successResponse(res, null, 'User logged out successfully', OK);
   } catch (error) {
-    logger.error('Error while logging out user', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+    logger.error('Logout error:', error);
+    return next(new AppError('Failed to logout', INTERNAL_SERVER));
   }
 };
 
 export const get_user = async (req, res, next) => {
   try {
     const { user_id } = req.user;
-    const user = await getUserById(user_id, 'id status is_verified');
+    const user = await getUserById(user_id, {
+      id: true,
+      status: true,
+      is_verified: true,
+    });
     const userDetails = await getUserDetails(
       user_id,
       'first_name last_name phone_number email profile_image'
     );
-
-    const location = await getUserLocation(
-      user_id,
-      'state_id district_id mandal_id constituency_id'
-    );
-
-    const userLocation = await getLocationByStateId({
-      state_id: location.state_id,
-      district_id: location.district_id,
-      mandal_id: location.mandal_id,
-      constituency_id: location.constituency_id,
+    const userLocation = await getUserLocation(user_id, {
+      state_id: true,
+      district_id: true,
+      mandal_id: true,
+      constituency_id: true,
     });
 
-    const state = {
-      id: userLocation.id,
-      name: userLocation.name,
-    };
+    const locationHierarchy = await getLocationByStateId({
+      state_id: userLocation.state_id,
+      district_id: userLocation.district_id,
+      mandal_id: userLocation.mandal_id,
+      constituency_id: userLocation.constituency_id,
+    });
 
-    const district = {
-      id: userLocation.District[0].id,
-      name: userLocation.District[0].name,
-    };
-
-    const mandal = {
-      id: userLocation.District[0].Mandal[0].id,
-      name: userLocation.District[0].Mandal[0].name,
-    };
-    const constituency = {
-      id: userLocation.District[0].Mandal[0].Constituency[0].id,
-      name: userLocation.District[0].Mandal[0].Constituency[0].name,
-    };
-
-    const userData = {
-      ...user,
-      ...userDetails,
-      ...userLocation,
-      location: {
-        state: state,
-        district: district,
-        mandal: mandal,
-        constituency: constituency,
+    const location = {
+      state: {
+        id: locationHierarchy.id,
+        name: locationHierarchy.name,
+      },
+      district: {
+        id: locationHierarchy.District[0].id,
+        name: locationHierarchy.District[0].name,
+      },
+      mandal: {
+        id: locationHierarchy.District[0].Mandal[0].id,
+        name: locationHierarchy.District[0].Mandal[0].name,
+      },
+      constituency: {
+        id: locationHierarchy.District[0].Mandal[0].Constituency[0].id,
+        name: locationHierarchy.District[0].Mandal[0].Constituency[0].name,
       },
     };
 
-    return res.status(OK).json(userData);
+    return successResponse(
+      res,
+      {
+        ...user,
+        ...userDetails,
+        ...userLocation,
+        location,
+      },
+      'User fetched successfully'
+    );
   } catch (error) {
-    logger.error('Error while getting user', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+    logger.error('Error fetching user details:', error);
+    return next(new AppError('Failed to fetch user details', INTERNAL_SERVER));
   }
 };

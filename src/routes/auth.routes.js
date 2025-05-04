@@ -7,7 +7,7 @@ import {
   update_profile,
 } from '../controllers/auth.controller.js';
 import multer from 'multer';
-import { verify_token, verify_user } from '../middlewares/auth.js';
+import { attachUser, verifyToken } from '../middlewares/auth.js';
 
 const Storage = multer.memoryStorage();
 const upload = multer({
@@ -18,13 +18,13 @@ const router = express.Router();
 router.post('/login', register);
 router.put(
   '/update_profile',
-  verify_token,
-  verify_user,
-  upload.single('profile_image'),
+  verifyToken,
+  attachUser,
+  upload.fields([{ name: 'profile_image' }, { name: 'aadhar_image' }]),
   update_profile
 );
-router.get('/jwt', verify_token, verify_user, decode_jwt);
-router.post('/logout', verify_token, logout);
-router.get('/user', verify_token, verify_user, get_user);
+router.get('/jwt', verifyToken, attachUser, decode_jwt);
+router.post('/logout', verifyToken, logout);
+router.get('/user', verifyToken, attachUser, get_user);
 
 export default router;

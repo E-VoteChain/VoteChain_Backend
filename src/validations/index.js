@@ -45,20 +45,45 @@ export const approveUserSchema = z.object({
   user_id: zodObjectId,
 });
 
-export const rejectUserSchema = z.object({
-  user_id: zodObjectId,
-  reason: z.string().min(10, {
-    message: 'Reason must be at least 10 characters long',
-  }),
-  rejected_fields: z
-    .array(z.string())
-    .min(1, {
-      message: 'At least one field must be specified for rejection',
-    })
-    .max(5, {
-      message: 'You can reject up to 5 fields at a time',
+const ALLOWED_FIELD_TYPES = [
+  'first_name',
+  'last_name',
+  'phone_number',
+  'email',
+  'update_location',
+  'profile_image',
+  'aadhar_image',
+];
+
+export const rejectUserSchema = z
+  .object({
+    user_id: zodObjectId,
+    reason: z.string().min(10, {
+      message: 'Reason must be at least 10 characters long',
     }),
-});
+    rejected_fields: z
+      .array(z.string())
+      .min(1, {
+        message: 'At least one field must be specified for rejection',
+      })
+      .max(5, {
+        message: 'You can reject up to 5 fields at a time',
+      }),
+  })
+  .refine(
+    (data) => {
+      const invalidFields = data.rejected_fields.filter(
+        (field) => !ALLOWED_FIELD_TYPES.includes(field)
+      );
+      if (invalidFields.length > 0) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: `Invalid field(s) specified for rejection: ${ALLOWED_FIELD_TYPES.join(', ')}`,
+    }
+  );
 
 export const createElectionSchema = z.object({
   election_name: z.string().nonempty('Election name is required'),

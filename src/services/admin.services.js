@@ -17,7 +17,7 @@ export const save_approve_user = async (user_id) => {
   }
 };
 
-export const save_reject_user = async ({ user_id, reason }) => {
+export const save_reject_user = async ({ user_id, reason, rejected_fields }) => {
   try {
     const data = await prisma.user.update({
       where: {
@@ -32,6 +32,7 @@ export const save_reject_user = async ({ user_id, reason }) => {
             },
             data: {
               rejected_reason: reason,
+              rejected_fields: rejected_fields,
             },
           },
         },
@@ -40,6 +41,7 @@ export const save_reject_user = async ({ user_id, reason }) => {
 
     return data;
   } catch (error) {
+    console.log('error', error);
     if (error instanceof PrismaClientValidationError) {
       throw new AppError('Prisma Validation Error', BAD_REQUEST, error);
     }

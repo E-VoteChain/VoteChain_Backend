@@ -7,6 +7,7 @@ import { OK, BAD_REQUEST } from '../constants/index.js';
  * @param {Object|null} [data=null] - The data to be included in the response.
  * @param {string} [message='Success'] - The success message.
  * @param {number} [statusCode=200] - The HTTP status code.
+ * @param {Object|null} [query=null] - The query parameters to be included in the response.
  * @returns {Object} The response object with the success data.
  */
 export const successResponse = (
@@ -14,8 +15,7 @@ export const successResponse = (
   data = null,
   message = 'Success',
   statusCode = OK,
-  query = null,
-  path = null
+  query = null
 ) => {
   return res.status(statusCode).json({
     status: 'success',

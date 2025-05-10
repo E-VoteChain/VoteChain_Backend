@@ -1,5 +1,12 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -134,13 +141,12 @@ model User {
 }
 
 model UserLocation {
-  id              String  @id @default(auto()) @map("_id") @db.ObjectId
-  state_id        String  @db.ObjectId
-  district_id     String  @db.ObjectId
-  mandal_id       String  @db.ObjectId
-  constituency_id String  @db.ObjectId
-  user_id         String  @unique @db.ObjectId
-  rejected_reason String?
+  id              String @id @default(auto()) @map("_id") @db.ObjectId
+  state_id        String @db.ObjectId
+  district_id     String @db.ObjectId
+  mandal_id       String @db.ObjectId
+  constituency_id String @db.ObjectId
+  user_id         String @unique @db.ObjectId
 
   User  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
   State State @relation(fields: [state_id], references: [id], onDelete: Cascade)
@@ -162,6 +168,7 @@ model UserDetails {
   phone_number    String
   profile_image   String
   aadhar_image    String
+  rejected_reason String?
   rejected_fields String[] @default([])
   user_id         String   @unique @db.ObjectId
 

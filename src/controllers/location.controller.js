@@ -12,7 +12,7 @@ import {
 export const getState = async (req, res, next) => {
   try {
     const states = await getStates();
-    return successResponse(res, OK, states);
+    return successResponse(res, states, 'Success', OK);
   } catch (error) {
     logger.error('Error while fetching states', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
@@ -23,7 +23,7 @@ export const getDistrict = async (req, res, next) => {
   try {
     const { state_id } = req.params;
     const districts = await getDistrictByState(state_id);
-    return successResponse(res, OK, districts);
+    return successResponse(res, districts, 'Success', OK);
   } catch (error) {
     logger.error('Error while fetching districts', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
@@ -34,7 +34,7 @@ export const getMandal = async (req, res, next) => {
   try {
     const { district_id } = req.params;
     const mandals = await getMandalByDistrict(district_id);
-    return successResponse(res, OK, mandals);
+    return successResponse(res, mandals, 'Success', OK);
   } catch (error) {
     logger.error('Error while fetching mandals', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
@@ -46,9 +46,9 @@ export const getConstituency = async (req, res, next) => {
     const { mandal_id } = req.params;
     const location = await getConstituencyByMandal(mandal_id);
     if (!location) {
-      return errorResponse(res, NOT_FOUND, 'Location not found');
+      return errorResponse(res, 'Location not found', null, NOT_FOUND);
     }
-    return successResponse(res, OK, location);
+    return successResponse(res, location, 'Success', OK);
   } catch (error) {
     logger.error('Error while fetching location by mandal', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));

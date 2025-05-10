@@ -30,7 +30,7 @@ export const approve_user = async (req, res, next) => {
     validateUserStatus(user);
 
     await save_approve_user(user_id);
-    return successResponse(res, OK, 'User approved successfully');
+    return successResponse(res, null, 'User approved successfully', OK);
   } catch (error) {
     console.log('error', error);
     if (error instanceof Error) {
@@ -45,7 +45,7 @@ export const approve_user = async (req, res, next) => {
 
 export const reject_user = async (req, res, next) => {
   try {
-    const { user_id, reason } = rejectUserSchema.parse(req.body);
+    const { user_id, reason, rejected_fields } = rejectUserSchema.parse(req.body);
 
     const user = await getUserById(user_id, {
       wallet_address: true,
@@ -55,8 +55,8 @@ export const reject_user = async (req, res, next) => {
 
     validateUserStatus(user);
 
-    await save_reject_user({ user_id, reason });
-    return successResponse(res, OK, 'User rejected successfully');
+    await save_reject_user({ user_id, reason, rejected_fields });
+    return successResponse(res, null, 'User rejected successfully', OK);
   } catch (error) {
     logger.error('Error while rejecting user', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));
@@ -142,8 +142,7 @@ export const getPendingUsers = async (req, res, next) => {
         limit: result.limit,
         totalPages: result.totalPages,
         totalResults: result.totalResults,
-      },
-      
+      }
     );
   } catch (error) {
     console.log('error', error);
@@ -158,14 +157,14 @@ export const create_election = async (req, res, next) => {
 
     // Validate the request body
     if (!election_name || !election_start_time || !election_end_time) {
-      return errorResponse(res, BAD_REQUEST, 'All fields are required');
+      return errorResponse(res, 'All fields are required', null, BAD_REQUEST);
     }
 
     // TODO: Add logic to create the election in the database
     // For example, you might want to call a service function to save the election details
     // await createElectionInDB({ election_name, election_start_time, election_end_time });
 
-    return successResponse(res, OK, 'Election created successfully');
+    return successResponse(res, null, 'Election created successfully', OK);
   } catch (error) {
     logger.error('Error while creating election', error);
     return next(new AppError('Something went wrong', INTERNAL_SERVER));

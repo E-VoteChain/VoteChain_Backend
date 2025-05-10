@@ -1,9 +1,35 @@
 import * as z from 'zod';
 import { ObjectId } from 'mongodb';
 
+const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/jpg'];
+
+const MAX_SIZE = 5 * 1024 * 1024;
+
+const ALLOWED_FIELD_TYPES = [
+  'first_name',
+  'last_name',
+  'phone_number',
+  'email',
+  'update_location',
+  'profile_image',
+  'aadhar_image',
+];
+
 const zodObjectId = z.string().refine((val) => ObjectId.isValid(val), {
   message: 'Invalid ObjectId',
 });
+
+const imageFileSchema = z
+  .any()
+  .refine((file) => !!file && !!file.mimetype && !!file.size, {
+    message: 'File is missing or invalid',
+  })
+  .refine((file) => ALLOWED_FILE_TYPES.includes(file.mimetype), {
+    message: 'Invalid image format. Only JPEG, JPG, and PNG are allowed.',
+  })
+  .refine((file) => file.size <= MAX_SIZE, {
+    message: 'Image size must be 5MB or less.',
+  });
 
 export const registerUser = z.object({
   wallet_address: z.string().transform((data, ctx) => {
@@ -44,16 +70,6 @@ export const updateUserSchema = z.object({
 export const approveUserSchema = z.object({
   user_id: zodObjectId,
 });
-
-const ALLOWED_FIELD_TYPES = [
-  'first_name',
-  'last_name',
-  'phone_number',
-  'email',
-  'update_location',
-  'profile_image',
-  'aadhar_image',
-];
 
 export const rejectUserSchema = z
   .object({
@@ -103,4 +119,25 @@ export const createElectionSchema = z.object({
 
 export const validateUserId = z.object({
   user_id: zodObjectId,
+});
+
+export const createParty = z.object({
+  party_name: z.string().nonempty('Party name is required'),
+  user_id: zodObjectId,
+  link_expiry: z.coerce
+    .number({
+      required_error: 'Link expiry is required',
+      invalid_type_error: 'Link expiry must be a number',
+    })
+    .min(1, 'Link expiry must be at least 1 day')
+    .max(30, 'Link expiry cannot be more than 30 days'),
+});
+
+export const validatePartyImage = z.object({
+  party_image: imageFileSchema,
+});
+
+export const validateEmailQuery = z.object({
+  email: z.string().email('Invalid email format'),
+  token: z.string().nonempty('Token is required'),
 });

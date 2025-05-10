@@ -37,7 +37,7 @@ export const getUserLocation = async (id, select = {}) => {
 
 export const getUserByEmail = async (email, select = {}) => {
   try {
-    return await prisma.user.findUnique({ where: { email }, select });
+    return await prisma.userDetails.findUnique({ where: { email }, select });
   } catch (error) {
     throw new AppError('Failed to get user by email', INTERNAL_SERVER, error);
   }

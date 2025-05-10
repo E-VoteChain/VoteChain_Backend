@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import process from 'process';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
@@ -11,6 +12,7 @@ import logger from './logger.js';
 import authRoutes from '../routes/auth.routes.js';
 import adminRoutes from '../routes/admin.routes.js';
 import locationRoutes from '../routes/location.routes.js';
+import partyRoutes from '../routes/party.routes.js';
 import { errorHandler } from '../utils/helper.js';
 import env from './env.js';
 
@@ -37,6 +39,22 @@ app.get('/', (req, res) => {
   return res.render('home');
 });
 
+app.get('/health', (_req, res) => {
+  const healthCheck = {
+    uptime: process.uptime(),
+    responsetime: process.hrtime(),
+    message: 'OK',
+    timeStamp: Date.now(),
+  };
+
+  try {
+    res.send(healthCheck);
+  } catch {
+    healthCheck.message = 'Error';
+    res.status(503).send();
+  }
+});
+
 if (env.env !== 'production') {
   app.use((req, res, next) => {
     logger.info(`${req.method} ${req.originalUrl}`);
@@ -47,6 +65,7 @@ if (env.env !== 'production') {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/location', locationRoutes);
+app.use('/api/v1/party', partyRoutes);
 
 app.use(errorHandler);
 

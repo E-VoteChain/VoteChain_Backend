@@ -1,0 +1,36 @@
+<%- include('../partials/header', { websiteName: 'VoteChain' }) %>
+
+  <h2>Hello <%= userName %>,</h2>
+
+  <p>We have received your request to register a new election party on <strong>VoteChain</strong>.</p>
+
+  <p>Our team has reviewed your request, and a preliminary record for your party — <strong>
+      <%= partyName %>
+    </strong> — has been created in our system.</p>
+
+  <h3>🚀 What’s Next?</h3>
+  <ul>
+    <li>
+      <strong>Complete Your Party Profile:</strong> To proceed, please fill out the full party details using the link
+      below:<br />
+      👉 <a href="<%= partyApplicationLink %>">Complete Party Application Form</a>
+    </li>
+  </ul>
+
+  <p><strong>Important:</strong> The link above will expire on <strong>
+      <%= endDate %>
+    </strong>. Please make sure to complete the form before this date.</p>
+
+  <p>Once your party information is submitted, it will be reviewed by our team and finalized for participation in the
+    election process.</p>
+
+  <p>If you have any questions or face issues during this step, don’t hesitate to contact us at
+    <a href="mailto:support@votechain.com">support@votechain.com</a>.
+  </p>
+
+  <p>Thank you for using VoteChain — empowering transparent and secure digital elections!</p>
+
+  <p>Best regards,<br />The VoteChain Team</p>
+
+  <%- include('../partials/footer', { websiteDomain: 'localhost:com' , currentYear: new Date().getFullYear(),
+    websiteName: 'VoteChain' , supportEmail: 'support@votechain.com' }) %>

@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -17,6 +11,7 @@ datasource db {
 enum Role {
   ADMIN
   USER
+  PHEAD
 }
 
 enum Status {
@@ -24,6 +19,12 @@ enum Status {
   APPROVED
   REJECTED
   INCOMPLETE
+}
+
+enum PartyType {
+  NATIONAL
+  STATE
+  REGIONAL
 }
 
 enum Election_level {
@@ -47,7 +48,7 @@ model District {
   id       String   @id @default(auto()) @map("_id") @db.ObjectId
   name     String
   state_id String   @db.ObjectId
-  states   State    @relation(fields: [state_id], references: [id], onDelete: Cascade)
+  states   State    @relation(fields: [state_id], references: [id])
   Mandal   Mandal[]
 
   @@index([name], name: "district_name")
@@ -59,7 +60,7 @@ model Mandal {
   id           String         @id @default(auto()) @map("_id") @db.ObjectId
   name         String
   district_id  String         @db.ObjectId
-  district     District       @relation(fields: [district_id], references: [id], onDelete: Cascade)
+  district     District       @relation(fields: [district_id], references: [id])
   Constituency Constituency[]
 
   @@index([name], name: "mandal_name")
@@ -71,7 +72,7 @@ model Constituency {
   id        String @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   mandal_id String @db.ObjectId
-  mandal    Mandal @relation(fields: [mandal_id], references: [id], onDelete: Cascade)
+  mandal    Mandal @relation(fields: [mandal_id], references: [id])
 
   @@index([name], name: "constituency_name")
   @@index([mandal_id], name: "constituency_mandal_id")
@@ -98,15 +99,35 @@ model Election {
 }
 
 model Party {
-  id                String  @id @default(auto()) @map("_id") @db.ObjectId
-  name              String
-  abbreviation      String
-  leader_name       String
-  symbol_url        String
-  is_national_party Boolean @default(false)
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String @unique
+  logo String
+
+  leader_id String @db.ObjectId
+  leader    User   @relation(fields: [leader_id], references: [id], onUpdate: NoAction)
+
+  party_token  String?
+  token_expiry DateTime?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
 
   candidates Candidate[]
-  created_at DateTime    @default(now())
+  details    PartyDetails[] @relation("PartyToDetails")
+}
+
+model PartyDetails {
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  abbreviation String @unique
+
+  party_id String @db.ObjectId
+  party    Party  @relation("PartyToDetails", fields: [party_id], references: [id])
+
+  members User[] @relation("UserPartyMembership")
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
 model Candidate {
@@ -116,8 +137,8 @@ model Candidate {
   election_id String  @db.ObjectId
   party_id    String? @db.ObjectId
 
-  Election Election @relation(fields: [election_id], references: [id], onDelete: Cascade)
-  Party    Party?   @relation(fields: [party_id], references: [id], onDelete: Cascade)
+  Election Election @relation(fields: [election_id], references: [id])
+  Party    Party?   @relation(fields: [party_id], references: [id])
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -132,12 +153,17 @@ model User {
   role           Role    @default(USER)
   status         Status  @default(INCOMPLETE)
 
-  Election     Election?      @relation(fields: [election_id], references: [id], onDelete: Cascade)
+  Election     Election?      @relation(fields: [election_id], references: [id])
   UserDetails  UserDetails[]
   UserLocation UserLocation[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  leadParties Party[]
+
+  partyDetails   PartyDetails? @relation("UserPartyMembership", fields: [partyDetailsId], references: [id])
+  partyDetailsId String?       @db.ObjectId
 }
 
 model UserLocation {
@@ -148,8 +174,8 @@ model UserLocation {
   constituency_id String @db.ObjectId
   user_id         String @unique @db.ObjectId
 
-  User  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  State State @relation(fields: [state_id], references: [id], onDelete: Cascade)
+  User  User  @relation(fields: [user_id], references: [id])
+  State State @relation(fields: [state_id], references: [id])
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -164,15 +190,15 @@ model UserDetails {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   first_name      String
   last_name       String
-  email           String
-  phone_number    String
+  email           String   @unique
+  phone_number    String   @unique
   profile_image   String
   aadhar_image    String
   rejected_reason String?
   rejected_fields String[] @default([])
   user_id         String   @unique @db.ObjectId
 
-  User       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  User       User     @relation(fields: [user_id], references: [id])
   created_at DateTime @default(now())
 }
 

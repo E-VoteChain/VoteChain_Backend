@@ -2,7 +2,7 @@ import env from '../config/env.js';
 import { UN_AUTHENTICATED, UN_AUTHORIZED } from '../constants/index.js';
 import { getUserById } from '../services/auth.services.js';
 import { AppError } from '../utils/AppError.js';
-import { extractUser } from '../utils/user.js';
+import { extractToken } from '../utils/user.js';
 import logger from '../config/logger.js';
 
 export const verifyToken = async (req, res, next) => {
@@ -13,7 +13,7 @@ export const verifyToken = async (req, res, next) => {
   }
 
   try {
-    const decoded = await extractUser(token, env.jwt.access_secret);
+    const decoded = await extractToken(token, env.jwt.access_secret);
 
     if (!decoded || !decoded.user_id) {
       return next(new AppError('Invalid token payload', UN_AUTHENTICATED));

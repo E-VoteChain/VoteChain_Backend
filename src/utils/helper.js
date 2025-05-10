@@ -129,3 +129,11 @@ export const errorHandler = (err, req, res, next) => {
     message: 'Something went wrong',
   });
 };
+
+export const checkTimeDifference = (date) => {
+  const now = new Date();
+  const tokenDate = new Date(date);
+  const differenceInMilliseconds = now - tokenDate;
+  const differenceInMinutes = Math.floor(differenceInMilliseconds / 1000 / 60);
+  return differenceInMinutes;
+};

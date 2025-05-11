@@ -6,7 +6,7 @@ import {
   validateUserStatus,
 } from '../utils/helper.js';
 import { AppError } from '../utils/AppError.js';
-import { BAD_REQUEST, INTERNAL_SERVER, OK } from '../constants/index.js';
+import { BAD_REQUEST, INTERNAL_SERVER, OK, UN_AUTHORIZED } from '../constants/index.js';
 import logger from '../config/logger.js';
 import { approveUserSchema, createParty, rejectUserSchema } from '../validations/index.js';
 import { getUserById, getUserDetails } from '../services/auth.services.js';
@@ -20,13 +20,12 @@ import env from '../config/env.js';
 import { save_party } from '../services/party.services.js';
 import { sendMail } from '../config/mail.js';
 
-export const approve_user = async (req, res, next) => {
+export const approve_user = async (req, res) => {
   try {
     const validatedFields = approveUserSchema.safeParse(req.body);
 
     if (!validatedFields.success) {
-      console.log('validatedFields.error', validatedFields.error);
-      return next(new AppError('Invalid input data', BAD_REQUEST));
+      throw new AppError('Invalid input data', BAD_REQUEST, formatError(validatedFields.error));
     }
 
     const { user_id } = validatedFields.data;
@@ -42,20 +41,29 @@ export const approve_user = async (req, res, next) => {
     await save_approve_user(user_id);
     return successResponse(res, null, 'User approved successfully', OK);
   } catch (error) {
-    console.log('error', error);
-    if (error instanceof Error) {
-      const formattedError = formatError(error);
-      return next(new AppError(formattedError, BAD_REQUEST));
+    if (error instanceof AppError) {
+      logger.error(`AppError: ${error.message}`, error);
+      return errorResponse(res, error.message, error.details, error.statusCode);
     }
-
     logger.error('Error while approving user', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+    return errorResponse(
+      res,
+      'Something went wrong while approving user',
+      error.message,
+      INTERNAL_SERVER
+    );
   }
 };
 
-export const reject_user = async (req, res, next) => {
+export const reject_user = async (req, res) => {
   try {
-    const { user_id, reason, rejected_fields } = rejectUserSchema.parse(req.body);
+    const validatedFields = rejectUserSchema.safeParse(req.body);
+
+    if (!validatedFields.success) {
+      throw new AppError('Invalid input data', BAD_REQUEST, formatError(validatedFields.error));
+    }
+
+    const { user_id, reason, rejected_fields } = validatedFields.data;
 
     const user = await getUserById(user_id, {
       wallet_address: true,
@@ -68,12 +76,20 @@ export const reject_user = async (req, res, next) => {
     await save_reject_user({ user_id, reason, rejected_fields });
     return successResponse(res, null, 'User rejected successfully', OK);
   } catch (error) {
-    logger.error('Error while rejecting user', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+    if (error instanceof AppError) {
+      logger.error(`AppError: ${error.message}`, error);
+      return errorResponse(res, error.message, error.details, error.statusCode);
+    }
+    return errorResponse(
+      res,
+      'Something went wrong while rejecting user',
+      error.message,
+      INTERNAL_SERVER
+    );
   }
 };
 
-export const getPendingUsers = async (req, res, next) => {
+export const getPendingUsers = async (req, res) => {
   const { page, limit, sortBy, populate, filter } = qs.parse(req.query);
 
   let parsedFilter = {};
@@ -82,7 +98,7 @@ export const getPendingUsers = async (req, res, next) => {
       parsedFilter = filter;
     } catch (error) {
       logger.error('Error parsing filter:', error);
-      return next(new AppError('Invalid filter format', BAD_REQUEST));
+      return errorResponse(res, 'Invalid filter format', error.message, BAD_REQUEST);
     }
   }
 
@@ -97,8 +113,7 @@ export const getPendingUsers = async (req, res, next) => {
     const result = await queryUsers(parsedFilter, options);
 
     if (!Array.isArray(result.results)) {
-      logger.error('Result is not an array', result);
-      return next(new AppError('Invalid result format', INTERNAL_SERVER));
+      throw new AppError('Invalid result format', INTERNAL_SERVER);
     }
 
     const usersWithLocation = [];
@@ -155,19 +170,27 @@ export const getPendingUsers = async (req, res, next) => {
       }
     );
   } catch (error) {
-    console.log('error', error);
-    // logger.error('Error while fetching users', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+    if (error instanceof AppError) {
+      logger.error(`AppError: ${error.message}`, error);
+      return errorResponse(res, error.message, error.details, error.statusCode);
+    }
+    logger.error('Error while fetching pending users', error);
+    return errorResponse(
+      res,
+      'Something went wrong while fetching pending users',
+      error.message,
+      INTERNAL_SERVER
+    );
   }
 };
 
-export const create_election = async (req, res, next) => {
+export const create_election = async (req, res) => {
   try {
     const { election_name, election_start_time, election_end_time } = req.body;
 
     // Validate the request body
     if (!election_name || !election_start_time || !election_end_time) {
-      return errorResponse(res, 'All fields are required', null, BAD_REQUEST);
+      throw new AppError('All fields are required', BAD_REQUEST);
     }
 
     // TODO: Add logic to create the election in the database
@@ -176,34 +199,48 @@ export const create_election = async (req, res, next) => {
 
     return successResponse(res, null, 'Election created successfully', OK);
   } catch (error) {
+    if (error instanceof AppError) {
+      logger.error(`AppError: ${error.message}`, error);
+      return errorResponse(res, error.message, error.details, error.statusCode);
+    }
     logger.error('Error while creating election', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+    return errorResponse(
+      res,
+      'Something went wrong while creating the election',
+      error.message,
+      INTERNAL_SERVER
+    );
   }
 };
 
-export const create_party = async (req, res, next) => {
+export const create_party = async (req, res) => {
   try {
     const validatedFields = createParty.safeParse(req.body);
 
     if (!validatedFields.success) {
-      console.log('validatedFields.error', validatedFields.error);
-      return next(new AppError('Invalid input data', BAD_REQUEST));
+      throw new AppError('Invalid input data', BAD_REQUEST, formatError(validatedFields.error));
     }
 
     const { party_name, link_expiry, user_id, party_symbol: logo } = validatedFields.data;
 
-    const user = req.user;
-    const status = user.status;
-    const role = user.role;
+    const { role } = req.user;
 
-    if (status !== 'approved') {
-      errorResponse(res, 'User is not approved', null, BAD_REQUEST);
-      return;
+    const user = await getUserById(user_id, {
+      id: true,
+      role: true,
+      status: true,
+    });
+
+    if (role !== 'admin') {
+      throw new AppError('Unauthorized', UN_AUTHORIZED);
     }
 
-    if (role === 'phead') {
-      errorResponse(res, 'User is already a party head', null, BAD_REQUEST);
-      return;
+    if (user.status === 'rejected' || user.status === 'pending' || user.status === 'incomplete') {
+      throw new AppError('User is not approved', BAD_REQUEST);
+    }
+
+    if (user.role === 'phead') {
+      throw new AppError('User is already a party head', UN_AUTHORIZED);
     }
 
     const party_symbol = emojiToUnicode(logo);
@@ -241,7 +278,16 @@ export const create_party = async (req, res, next) => {
 
     return successResponse(res, null, 'Party created successfully', OK, null, req.originalUrl);
   } catch (error) {
+    if (error instanceof AppError) {
+      logger.error(`AppError: ${error.message}`, error);
+      return errorResponse(res, error.message, error.details, error.statusCode);
+    }
     logger.error('Error while creating party', error);
-    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+    return errorResponse(
+      res,
+      'Something went wrong while creating the party',
+      error.message,
+      INTERNAL_SERVER
+    );
   }
 };

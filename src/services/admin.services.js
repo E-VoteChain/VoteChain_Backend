@@ -41,7 +41,6 @@ export const save_reject_user = async ({ user_id, reason, rejected_fields }) => 
 
     return data;
   } catch (error) {
-    console.log('error', error);
     if (error instanceof PrismaClientValidationError) {
       throw new AppError('Prisma Validation Error', BAD_REQUEST, error);
     }

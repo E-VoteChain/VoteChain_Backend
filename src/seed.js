@@ -1,5 +1,6 @@
 import logger from './config/logger.js';
 import prisma from './config/db.js';
+import process from 'process';
 
 const seedData = async () => {
   const data = [
@@ -336,4 +337,16 @@ const seedData = async () => {
   logger.info('✅ Seeding completed!');
 };
 
-export default seedData;
+const runSeed = async () => {
+  try {
+    await prisma.$connect();
+    await seedData();
+    await prisma.$disconnect();
+    console.log('Seeding completed successfully!');
+  } catch (error) {
+    console.error('Error seeding data:', error);
+    process.exit(1);
+  }
+};
+
+runSeed();

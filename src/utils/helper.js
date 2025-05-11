@@ -67,10 +67,6 @@ export const upload_to_cloudinary = (fileBuffer) => {
  * @param {Object|null} user
  */
 export const validateUserStatus = (user) => {
-  if (!user) {
-    throw new AppError('User not found', BAD_REQUEST);
-  }
-
   const statusErrors = {
     approved: 'User already approved',
     rejected: 'User already rejected',
@@ -139,4 +135,14 @@ export const emojiToUnicode = (emoji) => {
 
 export const unicodeToEmoji = (unicode) => {
   return String.fromCodePoint(...unicode.split('-').map((code) => parseInt(code, 16)));
+};
+
+export const validateAndUploadImage = async (file, schema) => {
+  const validatedFields = schema.safeParse(file);
+  if (!validatedFields.success) {
+    throw new AppError('Invalid file type', BAD_REQUEST, formatError(validatedFields.error));
+  }
+
+  const imageUrl = await upload_to_cloudinary(file.buffer);
+  return imageUrl;
 };

@@ -68,8 +68,8 @@ export const save_party = async (payload) => {
       },
     });
     return party;
-  } catch {
-    throw new AppError('Failed to save party', INTERNAL_SERVER);
+  } catch (error) {
+    throw new AppError('Failed to save party, please try again later', INTERNAL_SERVER, error);
   }
 };
 
@@ -81,9 +81,12 @@ export const getPartyByName = async (party_name, select) => {
       },
       select: select,
     });
+    if (!party) {
+      throw new AppError('Party not found with the given name', NOT_FOUND);
+    }
     return party;
-  } catch {
-    throw new AppError('Failed to fetch party', INTERNAL_SERVER);
+  } catch (error) {
+    throw new AppError('Failed to fetch party, please try again later', INTERNAL_SERVER, error);
   }
 };
 
@@ -99,7 +102,11 @@ export const removeVerifyToken = async (id) => {
       },
     });
     return party;
-  } catch {
-    throw new AppError('Failed to remove verify token', INTERNAL_SERVER);
+  } catch (error) {
+    throw new AppError(
+      'Failed to remove verification token, please try again later',
+      INTERNAL_SERVER,
+      error
+    );
   }
 };

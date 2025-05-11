@@ -1,5 +1,10 @@
-import { formatError, upload_to_cloudinary } from '../utils/helper.js';
-import { registerUser, updateUserSchema } from '../validations/index.js';
+import { formatError, validateAndUploadImage } from '../utils/helper.js';
+import {
+  registerUser,
+  updateUserSchema,
+  validateAadharImage,
+  validateProfileImage,
+} from '../validations/index.js';
 import { AppError } from '../utils/AppError.js';
 import { BAD_REQUEST, CREATED, INTERNAL_SERVER, OK } from '../constants/index.js';
 import logger from '../config/logger.js';
@@ -18,18 +23,14 @@ import { successResponse, errorResponse } from '../utils/response.js';
 
 export const register = async (req, res) => {
   try {
-    const validated = registerUser.safeParse(req.body);
+    const validatedFields = registerUser.safeParse(req.body);
 
-    if (!validated.success) {
-      return errorResponse(
-        res,
-        'Invalid wallet address',
-        formatError(validated.error),
-        BAD_REQUEST
-      );
+    if (!validatedFields.success) {
+      console.log('Validation error:', validatedFields.error);
+      throw new AppError('Invalid wallet address', BAD_REQUEST, formatError(validatedFields.error));
     }
 
-    const { wallet_address } = validated.data;
+    const { wallet_address } = validatedFields.data;
 
     const existing_user = await getUserByWalletAddress(wallet_address, {
       id: true,
@@ -72,51 +73,44 @@ export const register = async (req, res) => {
       sameSite: 'strict',
     });
 
-    return successResponse(res, { profile_completed: false }, 'User registered successfully');
+    return successResponse(
+      res,
+      { profile_completed: false },
+      'User registered successfully',
+      CREATED,
+      null
+    );
   } catch (error) {
     logger.error('Registration error:', error);
-    return errorResponse(res, 'Failed to register user', error.message, INTERNAL_SERVER);
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong ', error.message, INTERNAL_SERVER);
   }
 };
 
-export const update_profile = async (req, res, next) => {
+export const update_profile = async (req, res) => {
   try {
-    const validated = updateUserSchema.safeParse(req.body);
-    if (!validated.success) {
-      return next(new AppError(formatError(validated.error), BAD_REQUEST));
+    const validatedFields = updateUserSchema.safeParse(req.body);
+    if (!validatedFields.success) {
+      throw new AppError('Invalid input data', BAD_REQUEST, formatError(validatedFields.error));
     }
 
     const { user_id } = req.user;
-
-    const user = await getUserById(user_id, {
-      id: true,
-    });
-    if (!user) return next(new AppError('User not found', BAD_REQUEST));
-
-    let profile_image = null;
-    if (req.files.profile_image[0].buffer && req.files.profile_image[0].mimetype) {
-      const mimeType = req.files.profile_image[0].mimetype;
-      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-      if (!allowedMimeTypes.includes(mimeType)) {
-        return next(new AppError('Invalid image format', BAD_REQUEST));
-      }
-      if (req.files.profile_image[0].size > 5 * 1024 * 1024) {
-        return next(new AppError('Image size exceeds 5MB', BAD_REQUEST));
-      }
-      profile_image = await upload_to_cloudinary(req.files.profile_image[0].buffer);
+    const user = await getUserById(user_id, { id: true });
+    if (!user) {
+      throw new AppError('User not found', BAD_REQUEST);
     }
-    let aadhar_image = null;
-    if (req.files.aadhar_image[0].buffer && req.files.aadhar_image[0].mimetype) {
-      const mimeType = req.files.aadhar_image[0].mimetype;
-      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-      if (!allowedMimeTypes.includes(mimeType)) {
-        return next(new AppError('Invalid image format', BAD_REQUEST));
-      }
-      if (req.files.aadhar_image[0].size > 5 * 1024 * 1024) {
-        return next(new AppError('Image size exceeds 5MB', BAD_REQUEST));
-      }
-      aadhar_image = await upload_to_cloudinary(req.files.aadhar_image[0].buffer);
-    }
+
+    const profile_image_url = await validateAndUploadImage(
+      req.files.profile_image[0],
+      validateProfileImage
+    );
+
+    const aadhar_image_url = await validateAndUploadImage(
+      req.files.aadhar_image[0],
+      validateAadharImage
+    );
 
     const {
       first_name,
@@ -127,15 +121,15 @@ export const update_profile = async (req, res, next) => {
       district_id,
       mandal_id,
       constituency_id,
-    } = validated.data;
+    } = validatedFields.data;
 
     const user_payload = {
       first_name,
       last_name,
       phone_number,
       email,
-      profile_image: profile_image,
-      aadhar_image: aadhar_image,
+      profile_image: profile_image_url,
+      aadhar_image: aadhar_image_url,
       state_id,
       district_id,
       mandal_id,
@@ -143,15 +137,17 @@ export const update_profile = async (req, res, next) => {
     };
 
     const updatedUser = await updateUser(user.id, user_payload);
-
-    return successResponse(res, updatedUser, 'User updated successfully', CREATED);
+    return successResponse(res, updatedUser, 'User updated successfully', CREATED, null);
   } catch (error) {
     logger.error('Error updating user profile:', error);
-    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong ', error.message, INTERNAL_SERVER);
   }
 };
 
-export const decode_jwt = async (req, res, next) => {
+export const decode_jwt = async (req, res) => {
   try {
     const { user_id, wallet_address, role, status } = req.user;
     return successResponse(res, {
@@ -162,21 +158,21 @@ export const decode_jwt = async (req, res, next) => {
     });
   } catch (error) {
     logger.error('JWT decoding error:', error);
-    return next(new AppError('Failed to decode JWT', INTERNAL_SERVER));
+    return errorResponse(res, 'Failed to decode JWT', error.message, INTERNAL_SERVER);
   }
 };
 
-export const logout = async (req, res, next) => {
+export const logout = async (req, res) => {
   try {
     res.clearCookie('access_token');
-    return successResponse(res, null, 'User logged out successfully', OK);
+    return successResponse(res, null, 'User logged out successfully', OK, null);
   } catch (error) {
     logger.error('Logout error:', error);
-    return next(new AppError('Failed to logout', INTERNAL_SERVER));
+    return errorResponse(res, 'Failed to logout', error.message, INTERNAL_SERVER);
   }
 };
 
-export const get_user = async (req, res, next) => {
+export const get_user = async (req, res) => {
   try {
     const { user_id } = req.user;
     const user = await getUserById(user_id, {
@@ -233,6 +229,9 @@ export const get_user = async (req, res, next) => {
     );
   } catch (error) {
     logger.error('Error fetching user details:', error);
-    return next(new AppError('Failed to fetch user details', INTERNAL_SERVER));
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
   }
 };

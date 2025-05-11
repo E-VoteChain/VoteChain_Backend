@@ -1,19 +1,24 @@
 import prisma from '../config/db.js';
 import { AppError } from '../utils/AppError.js';
-import { BAD_REQUEST, INTERNAL_SERVER } from '../constants/index.js';
+import { BAD_REQUEST, INTERNAL_SERVER, NOT_FOUND } from '../constants/index.js';
 import { PrismaClientValidationError } from '@prisma/client/runtime/library';
 
 export const getUserById = async (id, select = {}) => {
   try {
-    return await prisma.user.findUnique({ where: { id }, select });
+    const user = await prisma.user.findUnique({ where: { id }, select });
+    if (!user) {
+      throw new AppError('User not found', BAD_REQUEST);
+    }
+    return user;
   } catch (error) {
-    throw new AppError('Failed to get user by ID', INTERNAL_SERVER, error);
+    throw new AppError('User not Found', NOT_FOUND, error);
   }
 };
 
 export const getUserByWalletAddress = async (wallet_address, select = {}) => {
   try {
-    return await prisma.user.findUnique({ where: { wallet_address }, select });
+    const user = await prisma.user.findUnique({ where: { wallet_address }, select });
+    return user;
   } catch (error) {
     throw new AppError('Failed to get user by wallet address', INTERNAL_SERVER, error);
   }
@@ -21,7 +26,11 @@ export const getUserByWalletAddress = async (wallet_address, select = {}) => {
 
 export const getUserDetails = async (id, select = {}) => {
   try {
-    return await prisma.userDetails.findUnique({ where: { user_id: id }, select });
+    const userDetails = await prisma.userDetails.findUnique({ where: { user_id: id }, select });
+    if (!userDetails) {
+      throw new AppError('User details not found', BAD_REQUEST);
+    }
+    return userDetails;
   } catch (error) {
     throw new AppError('Failed to get user details', INTERNAL_SERVER, error);
   }
@@ -29,7 +38,11 @@ export const getUserDetails = async (id, select = {}) => {
 
 export const getUserLocation = async (id, select = {}) => {
   try {
-    return await prisma.userLocation.findUnique({ where: { user_id: id }, select });
+    const userLocation = await prisma.userLocation.findUnique({ where: { user_id: id }, select });
+    if (!userLocation) {
+      throw new AppError('User location not found', BAD_REQUEST);
+    }
+    return userLocation;
   } catch (error) {
     throw new AppError('Failed to get user location', INTERNAL_SERVER, error);
   }
@@ -37,7 +50,11 @@ export const getUserLocation = async (id, select = {}) => {
 
 export const getUserByEmail = async (email, select = {}) => {
   try {
-    return await prisma.userDetails.findUnique({ where: { email }, select });
+    const userDetails = await prisma.userDetails.findUnique({ where: { email }, select });
+    if (!userDetails) {
+      throw new AppError('User not found by email', BAD_REQUEST);
+    }
+    return userDetails;
   } catch (error) {
     throw new AppError('Failed to get user by email', INTERNAL_SERVER, error);
   }
@@ -49,7 +66,7 @@ export const saveUser = async (payload) => {
   } catch (error) {
     if (error instanceof PrismaClientValidationError) {
       if (error.code === 'P2002') {
-        throw new AppError('User already exists', BAD_REQUEST, error); // More specific message
+        throw new AppError('User already exists', BAD_REQUEST, error);
       }
     }
     throw new AppError('Failed to save user', INTERNAL_SERVER, error);
@@ -70,7 +87,7 @@ export const updateUser = async (id, payload) => {
     aadhar_image,
   } = payload;
   try {
-    return await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id },
       data: {
         status: 'pending',
@@ -94,8 +111,9 @@ export const updateUser = async (id, payload) => {
         },
       },
     });
+
+    return updatedUser;
   } catch (error) {
-    console.log('Error', error);
     if (error instanceof PrismaClientValidationError) {
       if (error.code === 'P2002') {
         throw new AppError('User with this information already exists', BAD_REQUEST, error);
@@ -108,7 +126,7 @@ export const updateUser = async (id, payload) => {
 export const updateUserLocation = async (_id, payload) => {
   const { state_id, district_id, mandal_id, constituency_id } = payload;
   try {
-    return await prisma.user.update({
+    const updatedLocation = await prisma.user.update({
       where: { id: _id },
       data: {
         UserLocation: {
@@ -121,8 +139,9 @@ export const updateUserLocation = async (_id, payload) => {
         },
       },
     });
+
+    return updatedLocation;
   } catch (error) {
-    console.log('error', error);
     throw new AppError('Failed to update user location', INTERNAL_SERVER, error);
   }
 };

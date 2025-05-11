@@ -134,10 +134,6 @@ export const createParty = z.object({
     .max(30, 'Link expiry cannot be more than 30 days'),
 });
 
-export const validatePartyImage = z.object({
-  party_image: imageFileSchema,
-});
-
 export const validateEmailQuery = z.object({
   email: z.string().email('Invalid email format'),
   token: z.string().nonempty('Token is required'),
@@ -155,3 +151,8 @@ export const updateParty = z.object({
       message: 'Phone number must be between 10 and 15 digits and contain only digits',
     }),
 });
+
+// All Image validations
+export const validateAadharImage = imageFileSchema;
+export const validateProfileImage = imageFileSchema;
+export const validatePartyImage = imageFileSchema;

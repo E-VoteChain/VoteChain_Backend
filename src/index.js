@@ -8,6 +8,7 @@ let server = null;
 const startServer = async () => {
   try {
     await prisma.$connect();
+    
     logger.info('Prisma connected to database');
 
     server = app.listen(env.port, () => {

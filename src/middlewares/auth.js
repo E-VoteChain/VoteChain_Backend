@@ -9,7 +9,7 @@ export const verifyToken = async (req, res, next) => {
   const token = req.cookies?.access_token;
 
   if (!token) {
-    return next(new AppError('No authorization token found', UN_AUTHORIZED));
+    return next(new AppError('Authorization token is missing', UN_AUTHORIZED));
   }
 
   try {
@@ -24,7 +24,7 @@ export const verifyToken = async (req, res, next) => {
   } catch (err) {
     logger.error('JWT verification failed', err);
     res.clearCookie('access_token');
-    return next(new AppError('Invalid or expired token', UN_AUTHENTICATED));
+    return next(new AppError('Token is invalid or expired', UN_AUTHENTICATED));
   }
 };
 
@@ -33,23 +33,21 @@ export const attachUser = async (req, res, next) => {
     const { user_id } = req.user || {};
 
     if (!user_id) {
-      return next(new AppError('User not found in token', UN_AUTHORIZED));
+      return next(new AppError('No user found in token', UN_AUTHORIZED));
     }
 
-    const user = await getUserById(user_id, {
-      id: true,
-    });
+    const user = await getUserById(user_id, { id: true });
 
     if (!user) {
       res.clearCookie('access_token');
-      return next(new AppError('User no longer exists', UN_AUTHORIZED));
+      return next(new AppError('User not found', UN_AUTHORIZED));
     }
 
     req.userDetails = user;
     next();
   } catch (err) {
     logger.error('Error fetching user data', err);
-    return next(new AppError('Error verifying user identity', UN_AUTHORIZED));
+    return next(new AppError('Failed to verify user identity', UN_AUTHORIZED));
   }
 };
 
@@ -57,7 +55,12 @@ export const isAdmin = (req, res, next) => {
   const role = req.userDetails?.role || req.user?.role;
 
   if (role !== 'admin') {
-    return next(new AppError('You are not authorized to perform this action', UN_AUTHORIZED));
+    return next(
+      new AppError(
+        'You do not have the necessary permissions to perform this action',
+        UN_AUTHORIZED
+      )
+    );
   }
 
   next();

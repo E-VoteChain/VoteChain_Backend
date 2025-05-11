@@ -123,6 +123,7 @@ export const validateUserId = z.object({
 
 export const createParty = z.object({
   party_name: z.string().nonempty('Party name is required'),
+  party_symbol: z.string().nonempty('Party symbol is required'),
   user_id: zodObjectId,
   link_expiry: z.coerce
     .number({
@@ -140,4 +141,17 @@ export const validatePartyImage = z.object({
 export const validateEmailQuery = z.object({
   email: z.string().email('Invalid email format'),
   token: z.string().nonempty('Token is required'),
+});
+
+export const updateParty = z.object({
+  contact_email: z.string().email('Invalid email format'),
+  description: z.string(),
+  abbreviation: z.string(),
+  website: z.string().url('Invalid URL format'),
+  contact_phone: z
+    .string()
+    .trim()
+    .regex(/^\d{10,15}$/, {
+      message: 'Phone number must be between 10 and 15 digits and contain only digits',
+    }),
 });

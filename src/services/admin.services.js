@@ -7,7 +7,7 @@ export const save_approve_user = async (user_id) => {
   try {
     return await prisma.user.update({
       where: { id: user_id },
-      data: { status: 'APPROVED' },
+      data: { status: 'approved' },
     });
   } catch (error) {
     if (error instanceof PrismaClientValidationError) {
@@ -24,7 +24,7 @@ export const save_reject_user = async ({ user_id, reason, rejected_fields }) => 
         id: user_id,
       },
       data: {
-        status: 'REJECTED',
+        status: 'rejected',
         UserDetails: {
           update: {
             where: {

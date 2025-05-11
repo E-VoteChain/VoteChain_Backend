@@ -9,25 +9,20 @@ import { BAD_REQUEST, INTERNAL_SERVER } from '../constants/index.js';
 import logger from '../config/logger.js';
 
 /**
- * Formats errors, especially validation errors (like Zod).
- * @param {Error} error
- * @returns {Object} Formatted error object.
+ * 
+ @param {Error | any} error - The error object, usually from a validation library like Zod or a thrown Error.
+ * @returns {Object} Formatted error object. 
  */
 export const formatError = (error) => {
   if (error.name === 'ZodError' && Array.isArray(error.errors)) {
-    const formatted = {};
-    error.errors.forEach((e) => {
-      const path = e.path.length > 0 ? e.path.join('.') : 'root'; // If the path is empty, label it as 'root'
-      formatted[path] = e.message;
-    });
-    return formatted;
+    return error.errors.map((e) => `${e.path.join('.')} - ${e.message}`);
   }
 
   if (error instanceof Error) {
-    return { message: error.message };
+    return [error.message];
   }
 
-  return { message: 'Unknown error occurred' };
+  return ['Unknown error occurred'];
 };
 
 /**
@@ -77,8 +72,8 @@ export const validateUserStatus = (user) => {
   }
 
   const statusErrors = {
-    APPROVED: 'User already approved',
-    REJECTED: 'User already rejected',
+    approved: 'User already approved',
+    rejected: 'User already rejected',
   };
 
   if (statusErrors[user.status]) {
@@ -136,4 +131,12 @@ export const checkTimeDifference = (date) => {
   const differenceInMilliseconds = now - tokenDate;
   const differenceInMinutes = Math.floor(differenceInMilliseconds / 1000 / 60);
   return differenceInMinutes;
+};
+
+export const emojiToUnicode = (emoji) => {
+  return [...emoji].map((char) => char.codePointAt(0).toString(16).toUpperCase()).join('-');
+};
+
+export const unicodeToEmoji = (unicode) => {
+  return String.fromCodePoint(...unicode.split('-').map((code) => parseInt(code, 16)));
 };

@@ -1,19 +1,14 @@
 import {
+  emojiToUnicode,
   formatError,
   generateId,
   renderEmailEjs,
-  upload_to_cloudinary,
   validateUserStatus,
 } from '../utils/helper.js';
 import { AppError } from '../utils/AppError.js';
 import { BAD_REQUEST, INTERNAL_SERVER, OK } from '../constants/index.js';
 import logger from '../config/logger.js';
-import {
-  approveUserSchema,
-  createParty,
-  rejectUserSchema,
-  validatePartyImage,
-} from '../validations/index.js';
+import { approveUserSchema, createParty, rejectUserSchema } from '../validations/index.js';
 import { getUserById, getUserDetails } from '../services/auth.services.js';
 import { save_approve_user, save_reject_user } from '../services/admin.services.js';
 import { queryUsers } from '../services/user.services.js';
@@ -115,7 +110,7 @@ export const getPendingUsers = async (req, res, next) => {
       const formattedUser = {
         id: user.id,
         wallet_address: user.wallet_address,
-        status: user.status.toLowerCase(),
+        status: user.status,
         first_name: userDetails.first_name,
         last_name: userDetails.last_name,
         email: userDetails.email,
@@ -195,19 +190,11 @@ export const create_party = async (req, res, next) => {
       return next(new AppError('Invalid input data', BAD_REQUEST));
     }
 
-    const { party_name, link_expiry, user_id } = validatedFields.data;
-    const validatedImage = validatePartyImage.safeParse({ party_image: req.file });
-
-    if (!validatedImage.success) {
-      console.log('validatedImage.error', validatedImage.error);
-      return next(new AppError('Invalid image format', BAD_REQUEST));
-    }
-
-    const { party_image } = validatedImage.data;
+    const { party_name, link_expiry, user_id, party_symbol: logo } = validatedFields.data;
 
     const user = req.user;
-    const status = user.status.toLowerCase();
-    const role = user.role.toLowerCase();
+    const status = user.status;
+    const role = user.role;
 
     if (status !== 'approved') {
       errorResponse(res, 'User is not approved', null, BAD_REQUEST);
@@ -219,6 +206,7 @@ export const create_party = async (req, res, next) => {
       return;
     }
 
+    const party_symbol = emojiToUnicode(logo);
     const userDetails = await getUserDetails(user_id, {
       first_name: true,
       last_name: true,
@@ -236,7 +224,6 @@ export const create_party = async (req, res, next) => {
     const url = `${env.base_url}/api/v1/party/create/?email=${userDetails.email}&token=${verify_token}`;
     const expiry_time = new Date(Date.now() + link_expiry * 24 * 60 * 60 * 1000);
 
-    const party_symbol = await upload_to_cloudinary(party_image.buffer);
     await save_party({ party_name, party_symbol, expiry_time, user_id, verify_token });
 
     const html = await renderEmailEjs('emails/party-creation', {
@@ -255,6 +242,6 @@ export const create_party = async (req, res, next) => {
     return successResponse(res, null, 'Party created successfully', OK, null, req.originalUrl);
   } catch (error) {
     logger.error('Error while creating party', error);
-    return next(new AppError('Something went wrong', INTERNAL_SERVER));
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
   }
 };

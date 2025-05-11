@@ -9,29 +9,29 @@ datasource db {
 }
 
 enum Role {
-  ADMIN
-  USER
-  PHEAD
+  admin
+  user
+  phead
 }
 
 enum Status {
-  PENDING
-  APPROVED
-  REJECTED
-  INCOMPLETE
+  pending
+  approved
+  rejected
+  incomplete
 }
 
 enum PartyType {
-  NATIONAL
-  STATE
-  REGIONAL
+  national
+  state
+  regional
 }
 
 enum Election_level {
-  State
-  District
-  Mandal
-  CONSTITUENCY
+  state
+  district
+  mandal
+  constituency
 }
 
 model State {
@@ -99,9 +99,9 @@ model Election {
 }
 
 model Party {
-  id   String @id @default(auto()) @map("_id") @db.ObjectId
-  name String @unique
-  logo String
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  name   String @unique
+  symbol String @unique
 
   leader_id String @db.ObjectId
   leader    User   @relation(fields: [leader_id], references: [id], onUpdate: NoAction)
@@ -118,8 +118,13 @@ model Party {
 }
 
 model PartyDetails {
-  id           String @id @default(auto()) @map("_id") @db.ObjectId
-  abbreviation String @unique
+  id            String @id @default(auto()) @map("_id") @db.ObjectId
+  abbreviation  String
+  logo          String
+  description   String
+  contact_email String @unique
+  contact_phone String @unique
+  website       String
 
   party_id String @db.ObjectId
   party    Party  @relation("PartyToDetails", fields: [party_id], references: [id])
@@ -150,8 +155,8 @@ model User {
   is_verified    Boolean @default(false)
   has_voted      Boolean @default(false)
   election_id    String? @db.ObjectId
-  role           Role    @default(USER)
-  status         Status  @default(INCOMPLETE)
+  role           Role    @default(user)
+  status         Status  @default(incomplete)
 
   Election     Election?      @relation(fields: [election_id], references: [id])
   UserDetails  UserDetails[]

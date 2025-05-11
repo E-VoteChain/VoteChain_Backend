@@ -43,10 +43,10 @@ export const register = async (req, res) => {
         user_id: existing_user.id,
         wallet_address: existing_user.wallet_address,
         status: existing_user.status,
-        role: existing_user.role === 'ADMIN' ? 'admin' : 'user',
+        role: existing_user.role === 'admin' ? 'admin' : 'user',
       });
 
-      const profile_completed = existing_user.status !== 'INCOMPLETE';
+      const profile_completed = existing_user.status !== 'incomplete';
 
       res.cookie('access_token', access_token, {
         httpOnly: true,
@@ -62,7 +62,7 @@ export const register = async (req, res) => {
     const access_token = generateToken({
       user_id: saved_user.id,
       wallet_address: saved_user.wallet_address,
-      role: saved_user.role === 'ADMIN' ? 'admin' : 'user',
+      role: saved_user.role === 'admin' ? 'admin' : 'user',
       status: saved_user.status,
     });
 
@@ -147,7 +147,7 @@ export const update_profile = async (req, res, next) => {
     return successResponse(res, updatedUser, 'User updated successfully', CREATED);
   } catch (error) {
     logger.error('Error updating user profile:', error);
-    return next(new AppError('Failed to update user profile', INTERNAL_SERVER));
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
   }
 };
 

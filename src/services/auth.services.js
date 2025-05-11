@@ -47,13 +47,11 @@ export const saveUser = async (payload) => {
   try {
     return await prisma.user.create({ data: payload });
   } catch (error) {
-    // Handle Prisma client validation errors more explicitly
     if (error instanceof PrismaClientValidationError) {
       if (error.code === 'P2002') {
         throw new AppError('User already exists', BAD_REQUEST, error); // More specific message
       }
     }
-    // For other errors, return a generic failure message
     throw new AppError('Failed to save user', INTERNAL_SERVER, error);
   }
 };
@@ -75,7 +73,7 @@ export const updateUser = async (id, payload) => {
     return await prisma.user.update({
       where: { id },
       data: {
-        status: 'PENDING',
+        status: 'pending',
         UserDetails: {
           create: {
             first_name,

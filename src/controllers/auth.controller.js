@@ -44,7 +44,7 @@ export const register = async (req, res) => {
         user_id: existing_user.id,
         wallet_address: existing_user.wallet_address,
         status: existing_user.status,
-        role: existing_user.role === 'admin' ? 'admin' : 'user',
+        role: existing_user.role,
       });
 
       const profile_completed = existing_user.status !== 'incomplete';
@@ -153,7 +153,7 @@ export const decode_jwt = async (req, res) => {
     return successResponse(res, {
       user_id,
       wallet_address,
-      role: role === 'admin' ? 'admin' : 'user',
+      role: role,
       status,
     });
   } catch (error) {

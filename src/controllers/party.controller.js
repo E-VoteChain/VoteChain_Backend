@@ -1,17 +1,30 @@
 import env from '../config/env.js';
 import logger from '../config/logger.js';
-import { BAD_REQUEST, INTERNAL_SERVER } from '../constants/index.js';
+import { BAD_REQUEST, CREATED, INTERNAL_SERVER } from '../constants/index.js';
+import { getUserByWalletAddress, getUserDetails } from '../services/auth.services.js';
 import {
+  addMember,
   createPartyDetails,
   getPartyByName,
   removeVerifyToken,
   verifyAndIssueUpdateToken,
 } from '../services/party.services.js';
 import { AppError } from '../utils/AppError.js';
-import { checkTimeDifference, formatError, validateAndUploadImage } from '../utils/helper.js';
+import {
+  checkTimeDifference,
+  formatError,
+  renderEmailEjs,
+  validateAndUploadImage,
+} from '../utils/helper.js';
 import { errorResponse, successResponse } from '../utils/response.js';
 import { extractToken, generateToken } from '../utils/user.js';
-import { updateParty, validateEmailQuery, validatePartyImage } from '../validations/index.js';
+import {
+  updateParty,
+  validateEmailQuery,
+  validatePartyImage,
+  validateWalletAddress,
+} from '../validations/index.js';
+import { sendMail } from '../config/mail.js';
 
 export const verify_party_link = async (req, res) => {
   try {
@@ -61,7 +74,7 @@ export const verify_party_link = async (req, res) => {
   } catch (error) {
     if (error instanceof AppError) {
       logger.error(`AppError: ${error.message}`, error);
-      return errorResponse(res, error.message, error.details, error.statusCode);
+      return errorResponse(res, error.message, error.errors, error.statusCode);
     }
 
     if (error.message && error.message.toLowerCase().includes('jwt')) {
@@ -134,7 +147,7 @@ export const update_party = async (req, res) => {
   } catch (error) {
     if (error instanceof AppError) {
       logger.error(`AppError: ${error.message}`, error);
-      return errorResponse(res, error.message, error.details, error.statusCode);
+      return errorResponse(res, error.message, error.errors, error.statusCode);
     }
 
     logger.error('Error while updating party:', error);
@@ -144,5 +157,54 @@ export const update_party = async (req, res) => {
       null,
       INTERNAL_SERVER
     );
+  }
+};
+
+export const add_members = async (req, res) => {
+  try {
+    const { id: party_id, name } = req.party;
+    const validatedFields = validateWalletAddress.safeParse(req.body);
+
+    if (!validatedFields.success) {
+      throw new AppError('Invalid input data', BAD_REQUEST, formatError(validatedFields.error));
+    }
+
+    const { wallet_address } = validatedFields.data;
+    console.log('wallet address', wallet_address);
+
+    const user = await getUserByWalletAddress(wallet_address, {
+      id: true,
+    });
+    const userDetails = await getUserDetails(user.id, {
+      id: true,
+      first_name: true,
+      last_name: true,
+      email: true,
+    });
+    if (!user) {
+      throw new AppError('User not found', BAD_REQUEST);
+    }
+
+    const result = await addMember(party_id, user.id);
+
+    const html = await renderEmailEjs('emails/party-invite', {
+      userName: `${userDetails.first_name} ${userDetails.last_name}`,
+      partyName: name,
+    });
+
+    sendMail(userDetails.email, `You have been invited to join ${name}`, html);
+
+    return successResponse(res, result, 'Member added successfully', CREATED, {
+      party_id,
+      user_id: userDetails.id,
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      logger.error(`AppError: ${error.message}`, error);
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+
+    logger.error('Error while adding members:', error);
+    return errorResponse(res, 'Something went wrong while adding members', null, INTERNAL_SERVER);
   }
 };

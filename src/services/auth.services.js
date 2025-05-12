@@ -18,8 +18,10 @@ export const getUserById = async (id, select = {}) => {
 export const getUserByWalletAddress = async (wallet_address, select = {}) => {
   try {
     const user = await prisma.user.findUnique({ where: { wallet_address }, select });
+    console.log("user", user);
     return user;
   } catch (error) {
+    console.log("error", error);
     throw new AppError('Failed to get user by wallet address', INTERNAL_SERVER, error);
   }
 };

@@ -2,6 +2,24 @@ import prisma from '../config/db.js';
 import { INTERNAL_SERVER, NOT_FOUND } from '../constants/index.js';
 import { AppError } from '../utils/AppError.js';
 
+export const getPartyByUserId = async (id, select = {}) => {
+  try {
+    const party = await prisma.party.findUnique({
+      where: {
+        leader_id: id,
+      },
+      select: select,
+    });
+    if (!party) {
+      throw new AppError('Party not found with the given user ID', NOT_FOUND);
+    }
+    return party;
+  } catch (error) {
+    console.log('error', error);
+    throw new AppError('Failed to fetch party, please try again later', INTERNAL_SERVER, error);
+  }
+};
+
 export const verifyAndIssueUpdateToken = async ({ id, new_token, token_expiry }) => {
   return await prisma.$transaction(async (tx) => {
     const party = await tx.party.findUnique({
@@ -30,6 +48,14 @@ export const createPartyDetails = async (id, user_id, payload) => {
       where: { id: user_id },
       data: {
         role: 'phead',
+      },
+    });
+
+    await tx.party.update({
+      where: { id },
+      data: {
+        token_expiry: null,
+        party_token: null,
       },
     });
 
@@ -105,6 +131,30 @@ export const removeVerifyToken = async (id) => {
   } catch (error) {
     throw new AppError(
       'Failed to remove verification token, please try again later',
+      INTERNAL_SERVER,
+      error
+    );
+  }
+};
+
+export const addMember = async (party_id, user_id) => {
+  try {
+    await prisma.partyDetails.update({
+      where: {
+        party_id: party_id,
+      },
+      data: {
+        members: {
+          connect: {
+            id: user_id,
+          },
+        },
+      },
+    });
+  } catch (error) {
+    console.log('error', error);
+    throw new AppError(
+      'Failed to add member to party, please try again later',
       INTERNAL_SERVER,
       error
     );

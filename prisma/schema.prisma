@@ -79,31 +79,12 @@ model Constituency {
   @@map("constituencies")
 }
 
-model Election {
-  id          String         @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  purpose     String
-  start_date  DateTime
-  end_date    DateTime
-  state       String
-  status      Int            @default(0)
-  total_votes Int            @default(0)
-  level       Election_level
-  target_id   String         @db.ObjectId
-
-  candidates Candidate[]
-  voters     User[]
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
 model Party {
   id     String @id @default(auto()) @map("_id") @db.ObjectId
   name   String @unique
   symbol String @unique
 
-  leader_id String @db.ObjectId
+  leader_id String @unique @db.ObjectId
   leader    User   @relation(fields: [leader_id], references: [id], onUpdate: NoAction)
 
   party_token  String?
@@ -113,8 +94,7 @@ model Party {
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  candidates Candidate[]
-  details    PartyDetails[] @relation("PartyToDetails")
+  details PartyDetails[] @relation("PartyToDetails")
 }
 
 model PartyDetails {
@@ -126,24 +106,10 @@ model PartyDetails {
   contact_phone String @unique
   website       String
 
-  party_id String @db.ObjectId
+  party_id String @unique @db.ObjectId
   party    Party  @relation("PartyToDetails", fields: [party_id], references: [id])
 
   members User[] @relation("UserPartyMembership")
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
-model Candidate {
-  id          String  @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  slogan      String?
-  election_id String  @db.ObjectId
-  party_id    String? @db.ObjectId
-
-  Election Election @relation(fields: [election_id], references: [id])
-  Party    Party?   @relation(fields: [party_id], references: [id])
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -158,7 +124,6 @@ model User {
   role           Role    @default(user)
   status         Status  @default(incomplete)
 
-  Election     Election?      @relation(fields: [election_id], references: [id])
   UserDetails  UserDetails[]
   UserLocation UserLocation[]
 
@@ -204,14 +169,5 @@ model UserDetails {
   user_id         String   @unique @db.ObjectId
 
   User       User     @relation(fields: [user_id], references: [id])
-  created_at DateTime @default(now())
-}
-
-model Vote {
-  id            String @id @default(auto()) @map("_id") @db.ObjectId
-  voter_address String
-  election_id   String @db.ObjectId
-  candidate_id  String @db.ObjectId
-
   created_at DateTime @default(now())
 }

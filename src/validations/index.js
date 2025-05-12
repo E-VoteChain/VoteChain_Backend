@@ -121,6 +121,10 @@ export const validateUserId = z.object({
   user_id: zodObjectId,
 });
 
+export const validateWalletAddress = z.object({
+  wallet_address: z.string().nonempty('Wallet address is required'),
+});
+
 export const createParty = z.object({
   party_name: z.string().nonempty('Party name is required'),
   party_symbol: z.string().nonempty('Party symbol is required'),

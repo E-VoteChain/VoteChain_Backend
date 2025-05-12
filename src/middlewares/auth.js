@@ -1,9 +1,10 @@
 import env from '../config/env.js';
 import { UN_AUTHENTICATED, UN_AUTHORIZED } from '../constants/index.js';
-import { getUserById } from '../services/auth.services.js';
+import { getUserDetails } from '../services/auth.services.js';
 import { AppError } from '../utils/AppError.js';
 import { extractToken } from '../utils/user.js';
 import logger from '../config/logger.js';
+import { getPartyByUserId } from '../services/party.services.js';
 
 export const verifyToken = async (req, res, next) => {
   const token = req.cookies?.access_token;
@@ -19,6 +20,7 @@ export const verifyToken = async (req, res, next) => {
       return next(new AppError('Invalid token payload', UN_AUTHENTICATED));
     }
 
+    console.log('decoded', decoded);
     req.user = decoded;
     return next();
   } catch (err) {
@@ -36,7 +38,11 @@ export const attachUser = async (req, res, next) => {
       return next(new AppError('No user found in token', UN_AUTHORIZED));
     }
 
-    const user = await getUserById(user_id, { id: true });
+    const user = await getUserDetails(user_id, {
+      first_name: true,
+      last_name: true,
+      email: true,
+    });
 
     if (!user) {
       res.clearCookie('access_token');
@@ -52,7 +58,7 @@ export const attachUser = async (req, res, next) => {
 };
 
 export const isAdmin = (req, res, next) => {
-  const role = req.userDetails?.role || req.user?.role;
+  const role = req.user?.role;
 
   if (role !== 'admin') {
     return next(
@@ -63,5 +69,38 @@ export const isAdmin = (req, res, next) => {
     );
   }
 
+  next();
+};
+
+export const isPartyHead = (req, res, next) => {
+  const role = req.user?.role;
+  console.log('role', role);
+  if (role !== 'phead') {
+    return next(
+      new AppError(
+        'You do not have the necessary permissions to perform this action',
+        UN_AUTHORIZED
+      )
+    );
+  }
+
+  next();
+};
+
+export const attachParty = async (req, res, next) => {
+  const { user_id } = req.user;
+  console.log('user_id', user_id);
+
+  if (!user_id) {
+    return next(new AppError('No user found in token', UN_AUTHORIZED));
+  }
+
+  const party = await getPartyByUserId(user_id, { id: true, leader_id: true, name: true });
+  console.log('party', party);
+  if (!party) {
+    return next(new AppError('Party not found', UN_AUTHORIZED));
+  }
+
+  req.party = party;
   next();
 };

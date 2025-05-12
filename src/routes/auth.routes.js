@@ -19,7 +19,6 @@ router.post('/login', register);
 router.put(
   '/update_profile',
   verifyToken,
-  attachUser,
   upload.fields([{ name: 'profile_image' }, { name: 'aadhar_image' }]),
   update_profile
 );

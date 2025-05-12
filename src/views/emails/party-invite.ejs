@@ -1,0 +1,40 @@
+<%- include('../partials/header', { websiteName: 'VoteChain' }) %>
+
+    <h2>Welcome <%= userName %>,</h2>
+
+    <p>We're excited to let you know that you've been successfully added to the election party — <strong>
+            <%= partyName %>
+        </strong> — on <strong>VoteChain</strong>! 🎉</p>
+
+    <h3>🗳️ What This Means for You</h3>
+    <ul>
+        <li>
+            <strong>You're now a member of:</strong>
+            <%= partyName %>
+        </li>
+        <li>
+            <strong>Participation Access:</strong> You can now take part in activities, coordination, and digital
+            campaigns managed by your party within the VoteChain platform.
+        </li>
+        <li>
+            <strong>Party Dashboard:</strong> Access all relevant updates and actions via your party dashboard.
+        </li>
+    </ul>
+
+    <h3>📌 Next Steps</h3>
+    <ul>
+        <li>Log in to your VoteChain account to view and manage your party activities.</li>
+        <li>Stay updated with announcements, tasks, and election timelines shared by your party administrators.</li>
+    </ul>
+
+    <p>If you have any questions or encounter issues, feel free to reach out to us at
+        <a href="mailto:support@votechain.com">support@votechain.com</a>.
+    </p>
+
+    <p>We’re glad to have you on board — thank you for contributing to transparent and secure digital elections with
+        VoteChain.</p>
+
+    <p>Best regards,<br />The VoteChain Team</p>
+
+    <%- include('../partials/footer', { websiteDomain: 'localhost:com' , currentYear: new Date().getFullYear(),
+        websiteName: 'VoteChain' , supportEmail: 'support@votechain.com' }) %>

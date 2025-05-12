@@ -43,7 +43,7 @@ export const approve_user = async (req, res) => {
   } catch (error) {
     if (error instanceof AppError) {
       logger.error(`AppError: ${error.message}`, error);
-      return errorResponse(res, error.message, error.details, error.statusCode);
+      return errorResponse(res, error.message, error.errors, error.statusCode);
     }
     logger.error('Error while approving user', error);
     return errorResponse(
@@ -78,14 +78,9 @@ export const reject_user = async (req, res) => {
   } catch (error) {
     if (error instanceof AppError) {
       logger.error(`AppError: ${error.message}`, error);
-      return errorResponse(res, error.message, error.details, error.statusCode);
+      return errorResponse(res, error.message, error.errors, error.statusCode);
     }
-    return errorResponse(
-      res,
-      'Something went wrong while rejecting user',
-      error.message,
-      INTERNAL_SERVER
-    );
+    return errorResponse(res, 'Something went wrong while rejecting user', null, INTERNAL_SERVER);
   }
 };
 
@@ -172,13 +167,13 @@ export const getPendingUsers = async (req, res) => {
   } catch (error) {
     if (error instanceof AppError) {
       logger.error(`AppError: ${error.message}`, error);
-      return errorResponse(res, error.message, error.details, error.statusCode);
+      return errorResponse(res, error.message, error.errors, error.statusCode);
     }
     logger.error('Error while fetching pending users', error);
     return errorResponse(
       res,
       'Something went wrong while fetching pending users',
-      error.message,
+      null,
       INTERNAL_SERVER
     );
   }
@@ -201,13 +196,13 @@ export const create_election = async (req, res) => {
   } catch (error) {
     if (error instanceof AppError) {
       logger.error(`AppError: ${error.message}`, error);
-      return errorResponse(res, error.message, error.details, error.statusCode);
+      return errorResponse(res, error.message, error.errors, error.statusCode);
     }
     logger.error('Error while creating election', error);
     return errorResponse(
       res,
       'Something went wrong while creating the election',
-      error.message,
+      null,
       INTERNAL_SERVER
     );
   }
@@ -280,13 +275,13 @@ export const create_party = async (req, res) => {
   } catch (error) {
     if (error instanceof AppError) {
       logger.error(`AppError: ${error.message}`, error);
-      return errorResponse(res, error.message, error.details, error.statusCode);
+      return errorResponse(res, error.message, error.errors, error.statusCode);
     }
     logger.error('Error while creating party', error);
     return errorResponse(
       res,
       'Something went wrong while creating the party',
-      error.message,
+      null,
       INTERNAL_SERVER
     );
   }

@@ -1,6 +1,6 @@
 import env from '../config/env.js';
 import { UN_AUTHENTICATED, UN_AUTHORIZED } from '../constants/index.js';
-import { getUserDetails } from '../services/auth.services.js';
+import { getUserDetails, getUserLocation } from '../services/auth.services.js';
 import { AppError } from '../utils/AppError.js';
 import { extractToken } from '../utils/user.js';
 import logger from '../config/logger.js';
@@ -44,12 +44,22 @@ export const attachUser = async (req, res, next) => {
       email: true,
     });
 
+    const userLocation = await getUserLocation(user_id, {
+      state_id: true,
+      constituency_id: true,
+      district_id: true,
+      mandal_id: true,
+    });
+
     if (!user) {
       res.clearCookie('access_token');
       return next(new AppError('User not found', UN_AUTHORIZED));
     }
 
-    req.userDetails = user;
+    req.userDetails = {
+      ...user,
+      ...userLocation,
+    };
     next();
   } catch (err) {
     logger.error('Error fetching user data', err);

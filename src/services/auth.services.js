@@ -35,7 +35,6 @@ export const getUserByIds = async (ids, select = {}) => {
 export const getUserByWalletAddress = async (wallet_address, select = {}) => {
   try {
     const user = await prisma.user.findUnique({ where: { wallet_address }, select });
-    console.log('user', user);
     return user;
   } catch (error) {
     console.log('error', error);

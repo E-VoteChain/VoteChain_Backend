@@ -230,6 +230,14 @@ export const addCandidateSchema = z.object({
   ),
 });
 
+export const voteSchema = z.object({
+  election_id: zodObjectId,
+  candidate_id: zodObjectId,
+});
+
+export const ResultSchema = z.object({
+  election_id: zodObjectId,
+});
 // All Image validations
 export const validateAadharImage = imageFileSchema;
 export const validateProfileImage = imageFileSchema;

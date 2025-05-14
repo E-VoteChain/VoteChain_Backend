@@ -152,6 +152,7 @@ model User {
   partyDetails   PartyDetails? @relation("UserPartyMembership", fields: [partyDetailsId], references: [id])
   partyDetailsId String?       @db.ObjectId
   Candidate      Candidate[]
+  Vote           Vote[]
 }
 
 model UserLocation {
@@ -206,6 +207,7 @@ model Election {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+  Vote       Vote[]
 }
 
 model Candidate {
@@ -223,4 +225,19 @@ model Candidate {
   Constituency Constituency @relation(fields: [constituency_id], references: [id])
   created_at   DateTime     @default(now())
   updated_at   DateTime     @updatedAt
+  Vote         Vote[]
+}
+
+model Vote {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  user_id      String    @db.ObjectId
+  election_id  String    @db.ObjectId
+  candidate_id String    @db.ObjectId
+  election     Election  @relation(fields: [election_id], references: [id])
+  candidate    Candidate @relation(fields: [candidate_id], references: [id])
+  user         User      @relation(fields: [user_id], references: [id])
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  @@unique([user_id, election_id])
 }

@@ -3,10 +3,14 @@ import { BAD_REQUEST, CREATED, INTERNAL_SERVER } from '../constants/index.js';
 import { getUserByIds } from '../services/auth.services.js';
 import {
   addCandidates,
+  castVote,
   checkOverlappingElection,
   createElection,
+  getCandidateByElectionId,
   getElectionById,
   getElectionByName,
+  getVoteByElectionId,
+  updateElectionStatus,
 } from '../services/election.services.js';
 import { AppError } from '../utils/AppError.js';
 import { formatError } from '../utils/helper.js';
@@ -14,6 +18,8 @@ import { errorResponse, successResponse } from '../utils/response.js';
 import {
   addCandidateSchema,
   createElection as createElectionSchema,
+  ResultSchema,
+  voteSchema,
 } from '../validations/index.js';
 
 export const create_election = async (req, res) => {
@@ -214,6 +220,112 @@ export const add_candidates = async (req, res) => {
       }),
     };
     return successResponse(res, response, 'Candidates added successfully', CREATED, null);
+  } catch (error) {
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+  }
+};
+
+export const cast_vote = async (req, res) => {
+  try {
+    const validatedFields = voteSchema.safeParse(req.body);
+
+    if (!validatedFields.success) {
+      throw new AppError('Invalid vote data', BAD_REQUEST, formatError(validatedFields.error));
+    }
+
+    const { election_id, candidate_id } = validatedFields.data;
+
+    const election = await getElectionById(election_id, {
+      id: true,
+      status: true,
+      constituency_id: true,
+    });
+
+    const { user_id } = req.user;
+    const { constituency_id } = req.userDetails;
+
+    if (!election) {
+      throw new AppError('Election not found', BAD_REQUEST);
+    }
+
+    if (election.status !== 'ongoing') {
+      throw new AppError('Election is not ongoing', BAD_REQUEST);
+    }
+
+    if (election.constituency_id !== constituency_id) {
+      throw new AppError('User does not belong to the constituency', BAD_REQUEST);
+    }
+
+    const votes = await getVoteByElectionId(election_id, {
+      id: true,
+      user_id: true,
+    });
+
+    const existing_vote = votes.find((vote) => vote.user_id === user_id);
+
+    if (existing_vote) {
+      throw new AppError('User has already voted', BAD_REQUEST);
+    }
+
+    await castVote(user_id, election_id, candidate_id);
+
+    return successResponse(res, null, 'Vote casted successfully', CREATED, null);
+  } catch (error) {
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+  }
+};
+
+export const declare_result = async (req, res) => {
+  try {
+    const validatedFields = ResultSchema.safeParse(req.body);
+
+    if (!validatedFields.success) {
+      throw new AppError('Invalid result data', BAD_REQUEST, formatError(validatedFields.error));
+    }
+
+    const { election_id } = validatedFields.data;
+    const election = await getElectionById(election_id, {
+      id: true,
+      status: true,
+      constituency_id: true,
+    });
+
+    const candidate = await getCandidateByElectionId(election_id, {
+      id: true,
+      user_id: true,
+      status: true,
+      _count: {
+        select: {
+          Vote: true,
+        },
+      },
+    });
+
+    if (!election) {
+      throw new AppError('Election not found', BAD_REQUEST);
+    }
+
+    if (election.status !== 'completed') {
+      throw new AppError('Election is not completed', BAD_REQUEST);
+    }
+
+    if (candidate.length === 0) {
+      throw new AppError('No candidates found for this election', BAD_REQUEST);
+    }
+
+    const winner = candidate.reduce((prev, current) => {
+      return prev._count.Vote > current._count.Vote ? prev : current;
+    });
+
+    await updateElectionStatus(winner.id);
+
+    return successResponse(res, null, 'Result declared successfully', CREATED, null);
   } catch (error) {
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);

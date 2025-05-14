@@ -19,6 +19,21 @@ export const getElectionById = async (id, select = {}) => {
   }
 };
 
+export const getCandidateByElectionId = async (election_id, select = {}) => {
+  try {
+    const candidate = await prisma.candidate.findMany({
+      where: {
+        election_id: election_id,
+      },
+      select: select,
+    });
+
+    return candidate;
+  } catch (error) {
+    throw new AppError('Candidate not Found', NOT_FOUND, error);
+  }
+};
+
 export const getElectionByName = async (election_name, select = {}) => {
   try {
     const election = await prisma.election.findUnique({
@@ -117,5 +132,73 @@ export const addCandidates = async (payload) => {
   } catch (error) {
     console.log('error', error);
     throw new AppError('Error adding candidates', INTERNAL_SERVER, error);
+  }
+};
+
+export const getVoteByElectionId = async (election_id, select = {}) => {
+  try {
+    const vote = await prisma.vote.findMany({
+      where: {
+        election_id: election_id,
+      },
+      select: select,
+    });
+
+    return vote;
+  } catch (error) {
+    throw new AppError('Vote not Found', NOT_FOUND, error);
+  }
+};
+
+export const castVote = async (user_id, election_id, candidate_id) => {
+  try {
+    const vote = await prisma.vote.create({
+      data: {
+        user_id,
+        election_id,
+        candidate_id,
+      },
+    });
+    return vote;
+  } catch (error) {
+    throw new AppError('Error casting vote', INTERNAL_SERVER, error);
+  }
+};
+
+export const updateElectionStatus = async (election_id, winner_id) => {
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.candidate.update({
+        where: {
+          id: winner_id,
+        },
+        data: {
+          status: 'win',
+        },
+      });
+
+      await tx.candidate.updateMany({
+        where: {
+          election_id: election_id,
+          NOT: {
+            id: winner_id,
+          },
+        },
+        data: {
+          status: 'lose',
+        },
+      });
+
+      await tx.election.update({
+        where: {
+          id: election_id,
+        },
+        data: {
+          result_declared: true,
+        },
+      });
+    });
+  } catch (error) {
+    throw new AppError('Error updating election status', INTERNAL_SERVER, error);
   }
 };

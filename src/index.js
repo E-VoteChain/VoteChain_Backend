@@ -3,14 +3,16 @@ import env from './config/env.js';
 import logger from './config/logger.js';
 import prisma from './config/db.js';
 import process from 'process';
+import { startElectionCron } from './utils/cron.js';
 let server = null;
 
 const startServer = async () => {
   try {
     await prisma.$connect();
-    
+
     logger.info('Prisma connected to database');
 
+    startElectionCron();
     server = app.listen(env.port, () => {
       logger.info(`Server started at http://localhost:${env.port}`);
     });

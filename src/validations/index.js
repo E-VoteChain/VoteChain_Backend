@@ -156,6 +156,80 @@ export const updateParty = z.object({
     }),
 });
 
+const oneDayMs = 24 * 60 * 60 * 1000;
+
+export const createElection = z
+  .object({
+    title: z
+      .string()
+      .min(10, { message: 'Title must be at least 10 characters long' })
+      .max(100, { message: 'Title must be at most 100 characters long' })
+      .nonempty({ message: 'Title is required' })
+      .refine((val) => /^[a-zA-Z0-9 ]+$/.test(val), {
+        message: 'Title can only contain letters, numbers, and spaces (no special characters)',
+      })
+      .transform((val) => val.replace(/\s+/g, '').toLowerCase()),
+    purpose: z
+      .string()
+      .min(10, { message: 'Purpose must be at least 10 characters long' })
+      .max(1000, { message: 'Purpose must be at most 1000 characters long' })
+      .nonempty({ message: 'Purpose is required' })
+      .refine((val) => /^[a-zA-Z0-9 -]+$/.test(val), {
+        message: 'Purpose can only contain letters, numbers, and spaces (no special characters)',
+      })
+      .transform((val) => val.replace(/\s+/g, '').toLowerCase()),
+
+    start_date: z
+      .string()
+      .datetime({ message: 'Invalid start date format' })
+      .refine(
+        (val) => {
+          const now = new Date();
+          const start = new Date(val);
+          return start.getTime() - now.getTime() >= oneDayMs;
+        },
+        { message: 'Start date must be at least 1 day from today' }
+      ),
+
+    end_date: z.string().datetime({ message: 'Invalid end date format' }),
+
+    election_type: z.enum(['lok_sabha', 'vidhan_sabha', 'municipal', 'panchayat', 'by_election'], {
+      errorMap: () => ({ message: 'Invalid election type' }),
+    }),
+
+    constituency_id: zodObjectId,
+  })
+  .refine(
+    (data) => {
+      const start = new Date(data.start_date);
+      const end = new Date(data.end_date);
+      return end.getTime() - start.getTime() >= oneDayMs;
+    },
+    {
+      message: 'End date must be at least 1 day after start date',
+      path: ['end_date'],
+    }
+  );
+
+export const addCandidateSchema = z.object({
+  election_id: zodObjectId,
+  candidates: z.array(
+    z.object({
+      user_id: zodObjectId,
+      description: z
+        .string()
+        .min(10, { message: 'Description must be at least 10 characters long' })
+        .max(1000, { message: 'Description must be at most 1000 characters long' })
+        .nonempty({ message: 'Description is required' })
+        .refine((val) => /^[a-zA-Z0-9 -]+$/.test(val), {
+          message:
+            'Description can only contain letters, numbers, and spaces (no special characters)',
+        })
+        .transform((val) => val.replace(/\s+/g, '').toLowerCase()),
+    })
+  ),
+});
+
 // All Image validations
 export const validateAadharImage = imageFileSchema;
 export const validateProfileImage = imageFileSchema;

@@ -89,14 +89,12 @@ export const isPartyHead = (req, res, next) => {
 
 export const attachParty = async (req, res, next) => {
   const { user_id } = req.user;
-  console.log('user_id', user_id);
 
   if (!user_id) {
     return next(new AppError('No user found in token', UN_AUTHORIZED));
   }
 
   const party = await getPartyByUserId(user_id, { id: true, leader_id: true, name: true });
-  console.log('party', party);
   if (!party) {
     return next(new AppError('Party not found', UN_AUTHORIZED));
   }

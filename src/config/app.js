@@ -13,6 +13,7 @@ import authRoutes from '../routes/auth.routes.js';
 import adminRoutes from '../routes/admin.routes.js';
 import locationRoutes from '../routes/location.routes.js';
 import partyRoutes from '../routes/party.routes.js';
+import electionRoutes from '../routes/election.routes.js';
 import { errorHandler } from '../utils/helper.js';
 import env from './env.js';
 
@@ -66,7 +67,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/location', locationRoutes);
 app.use('/api/v1/party', partyRoutes);
-
+app.use('/api/v1/election', electionRoutes);
 app.use(errorHandler);
 
 export default app;

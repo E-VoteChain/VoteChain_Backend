@@ -22,7 +22,7 @@ router.put(
   upload.fields([{ name: 'profile_image' }, { name: 'aadhar_image' }]),
   update_profile
 );
-router.get('/jwt', verifyToken, attachUser, decode_jwt);
+router.get('/jwt', verifyToken, decode_jwt);
 router.post('/logout', verifyToken, logout);
 router.get('/user', verifyToken, attachUser, get_user);
 

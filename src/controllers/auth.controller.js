@@ -26,7 +26,6 @@ export const register = async (req, res) => {
     const validatedFields = registerUser.safeParse(req.body);
 
     if (!validatedFields.success) {
-      console.log('Validation error:', validatedFields.error);
       throw new AppError('Invalid wallet address', BAD_REQUEST, formatError(validatedFields.error));
     }
 
@@ -180,10 +179,14 @@ export const get_user = async (req, res) => {
       status: true,
       is_verified: true,
     });
-    const userDetails = await getUserDetails(
-      user_id,
-      'first_name last_name phone_number email profile_image'
-    );
+    const userDetails = await getUserDetails(user_id, {
+      first_name: true,
+      last_name: true,
+      phone_number: true,
+      email: true,
+      profile_image: true,
+      aadhar_image: true,
+    });
     const userLocation = await getUserLocation(user_id, {
       state_id: true,
       district_id: true,
@@ -216,7 +219,7 @@ export const get_user = async (req, res) => {
         name: locationHierarchy.District[0].Mandal[0].Constituency[0].name,
       },
     };
-
+    console.log('Location:', location);
     return successResponse(
       res,
       {

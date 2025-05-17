@@ -84,7 +84,8 @@ export const rejectUserSchema = z
       })
       .max(5, {
         message: 'You can reject up to 5 fields at a time',
-      }),
+      })
+      .optional(),
   })
   .refine(
     (data) => {

@@ -20,7 +20,6 @@ export const verifyToken = async (req, res, next) => {
       return next(new AppError('Invalid token payload', UN_AUTHENTICATED));
     }
 
-    console.log('decoded', decoded);
     req.user = decoded;
     return next();
   } catch (err) {

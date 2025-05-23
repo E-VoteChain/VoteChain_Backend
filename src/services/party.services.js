@@ -73,7 +73,6 @@ export const getPartyByUserId = async (id, select = {}) => {
     }
     return party;
   } catch (error) {
-    console.log('error', error);
     throw new AppError('Failed to fetch party, please try again later', INTERNAL_SERVER, error);
   }
 };
@@ -302,7 +301,6 @@ export const getPartyMembers = async (user_id, party_id, select = {}) => {
     });
     return member;
   } catch (error) {
-    console.log('error', error);
     throw new AppError(
       'Failed to fetch party members, please try again later',
       INTERNAL_SERVER,
@@ -329,7 +327,6 @@ export const addMember = async (party_id, user_id) => {
       },
     });
   } catch (error) {
-    console.log('error', error);
     throw new AppError(
       'Failed to add member to party, please try again later',
       INTERNAL_SERVER,
@@ -370,7 +367,6 @@ export const queryParties = async (filter, options) => {
   try {
     return await paginate('party', filter, options);
   } catch (error) {
-    console.log('error', error);
     throw new AppError('Failed to query parties', INTERNAL_SERVER, error);
   }
 };

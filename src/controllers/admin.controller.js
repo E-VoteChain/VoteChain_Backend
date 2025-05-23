@@ -41,7 +41,6 @@ export const approve_user = async (req, res) => {
     await save_approve_user(userId);
     return successResponse(res, null, 'User approved successfully', OK);
   } catch (error) {
-    console.log('error', error);
     if (error instanceof AppError) {
       logger.error(`AppError: ${error.message}`, error);
       return errorResponse(res, error.message, error.errors, error.statusCode);
@@ -255,7 +254,6 @@ export const create_party = async (req, res) => {
       req.originalUrl
     );
   } catch (error) {
-    console.log('error', error);
     if (error instanceof AppError) {
       logger.error(`AppError: ${error.message}`, error);
       return errorResponse(res, error.message, error.errors, error.statusCode);

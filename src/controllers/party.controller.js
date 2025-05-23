@@ -117,7 +117,6 @@ export const verify_party_link = async (req, res) => {
       req.query
     );
   } catch (error) {
-    console.log('error', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }
@@ -144,7 +143,6 @@ export const update_party = async (req, res) => {
     }
 
     const { userId } = req.user;
-    console.log('req.user', req.user);
 
     const tokenDetails = await getPartyByToken(token, {
       id: true,
@@ -169,9 +167,6 @@ export const update_party = async (req, res) => {
 
     const party = tokenDetails.party;
     const partyMembers = party.partyMembers[0];
-    console.log('party', party);
-    console.log('UserId', userId);
-    console.log('party.userId', partyMembers);
 
     if (partyMembers.userId !== userId) {
       throw new AppError('You are not authorized to update this party', BAD_REQUEST);
@@ -236,7 +231,6 @@ export const update_party = async (req, res) => {
 
     return successResponse(res, result, 'Party updated successfully', OK);
   } catch (error) {
-    console.log('error', error);
     if (error instanceof AppError) {
       logger.error(`AppError: ${error.message}`, error);
       return errorResponse(res, error.message, error.errors, error.statusCode);
@@ -254,7 +248,6 @@ export const update_party = async (req, res) => {
 
 export const add_members = async (req, res) => {
   try {
-    console.log('req.body', req.party);
     const { id: party_id, name } = req.party;
     const validatedFields = validateWalletAddress.safeParse(req.body);
 
@@ -360,7 +353,6 @@ export const join_party = async (req, res) => {
     }
 
     const result = await joinPartyAsMember(party.id, userId);
-    console.log('result', result);
 
     return successResponse(res, result, 'Party joined successfully', CREATED, {
       party_id: party.id,
@@ -382,14 +374,12 @@ export const join_party = async (req, res) => {
 export const approve_user = async (req, res) => {
   try {
     const { id: partyId } = req.party;
-    console.log('req.party', req.party);
     const validatedFields = validateUserId.safeParse(req.body);
     if (!validatedFields.success) {
       throw new AppError('Invalid input data', BAD_REQUEST, formatError(validatedFields.error));
     }
 
     const { userId } = validatedFields.data;
-    console.log('userId', userId);
     const party = await getPartyMembers(userId, partyId, {
       id: true,
       status: true,
@@ -408,15 +398,10 @@ export const approve_user = async (req, res) => {
       throw new AppError('User invitation is rejected', BAD_REQUEST);
     }
 
-    console.log(typeof userId, userId); // must be 'string'
-    console.log(typeof partyId, partyId); // must be 'string'
-
     const result = await approveUser(party.id);
-    console.log('result', result);
 
     return successResponse(res, result, 'User approved successfully', OK);
   } catch (error) {
-    console.log('error', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }
@@ -444,7 +429,6 @@ export const reject_user = async (req, res) => {
       userId: true,
       role: true,
     });
-    console.log('party', party);
     if (!party) {
       throw new AppError('Party member not found', BAD_REQUEST);
     }
@@ -461,7 +445,6 @@ export const reject_user = async (req, res) => {
 
     return successResponse(res, result, 'User rejected successfully', OK);
   } catch (error) {
-    console.log('error', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }
@@ -547,7 +530,6 @@ export const get_party_by_token = async (req, res) => {
       req.query
     );
   } catch (error) {
-    console.log(error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }
@@ -590,7 +572,6 @@ export const get_all_parties = async (req, res) => {
       req.query
     );
   } catch (error) {
-    console.log('error', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }
@@ -684,10 +665,8 @@ export const get_party_by_wallet_id = async (req, res) => {
       })),
     };
 
-    console.log('formattedPartyDetails', formattedPartyDetails);
     return successResponse(res, formattedPartyDetails, 'Party fetched successfully', OK);
   } catch (error) {
-    console.log('error', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }
@@ -749,7 +728,6 @@ export const get_party_members = async (req, res) => {
 
     return successResponse(res, formattedData, 'Fetched successfully', OK, req.query);
   } catch (error) {
-    console.log('error', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }

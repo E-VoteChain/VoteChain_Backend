@@ -14,7 +14,6 @@ export const getElectionById = async (id, select = {}) => {
 
     return election;
   } catch (error) {
-    console.log('error', error);
     throw new AppError('Election not Found', NOT_FOUND, error);
   }
 };
@@ -45,7 +44,6 @@ export const getElectionByName = async (election_name, select = {}) => {
 
     return election;
   } catch (error) {
-    console.log('error', error);
     throw new AppError('Election not Found', NOT_FOUND, error);
   }
 };
@@ -63,15 +61,15 @@ export const checkOverlappingElection = async (
         election_type: election_type,
         AND: [
           {
-            OR: [{ status: 'upcoming' }, { status: 'ongoing' }],
+            OR: [{ status: 'UPCOMING' }, { status: 'ONGOING' }],
           },
           {
-            start_date: {
+            startDate: {
               lte: end_date,
             },
           },
           {
-            end_date: {
+            endDate: {
               gte: start_date,
             },
           },
@@ -117,10 +115,10 @@ export const addCandidates = async (payload) => {
       const candidates = payload.map((candidate) => {
         return tx.candidate.create({
           data: {
-            user_id: candidate.user_id,
-            election_id: candidate.election_id,
-            constituency_id: candidate.constituency_id,
-            party_id: candidate.party_id,
+            userId: candidate.user_id,
+            electionId: candidate.election_id,
+            constituencyId: candidate.constituency_id,
+            partyId: candidate.party_id,
             description: candidate.description,
           },
         });
@@ -130,7 +128,6 @@ export const addCandidates = async (payload) => {
     });
     return result;
   } catch (error) {
-    console.log('error', error);
     throw new AppError('Error adding candidates', INTERNAL_SERVER, error);
   }
 };

@@ -3,11 +3,28 @@ import prisma from '../config/db.js';
 import { BAD_REQUEST, INTERNAL_SERVER } from '../constants/index.js';
 import { AppError } from '../utils/AppError.js';
 
-export const save_approve_user = async (user_id) => {
+export const save_approve_user = async (userId) => {
   try {
-    return await prisma.user.update({
-      where: { id: user_id },
-      data: { status: 'approved' },
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: {
+          id: userId,
+        },
+        data: {
+          status: 'APPROVED',
+          verifiedAt: new Date(),
+          userDetails: {
+            update: {
+              where: {
+                userId: userId,
+              },
+              data: {
+                approvedAt: new Date(),
+              },
+            },
+          },
+        },
+      });
     });
   } catch (error) {
     if (error instanceof PrismaClientValidationError) {
@@ -17,22 +34,22 @@ export const save_approve_user = async (user_id) => {
   }
 };
 
-export const save_reject_user = async ({ user_id, reason, rejected_fields }) => {
+export const save_reject_user = async ({ userId, reason, rejectedFields }) => {
   try {
     const data = await prisma.user.update({
       where: {
-        id: user_id,
+        id: userId,
       },
       data: {
-        status: 'rejected',
-        UserDetails: {
+        status: 'REJECTED',
+        userDetails: {
           update: {
             where: {
-              user_id: user_id,
+              userId: userId,
             },
             data: {
-              rejected_reason: reason,
-              rejected_fields: rejected_fields,
+              rejectedReason: reason,
+              rejectedFields: rejectedFields,
             },
           },
         },

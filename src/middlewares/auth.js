@@ -1,27 +1,29 @@
 import env from '../config/env.js';
-import { UN_AUTHENTICATED, UN_AUTHORIZED } from '../constants/index.js';
-import { getUserDetails, getUserLocation } from '../services/auth.services.js';
+import { UN_AUTHENTICATED, FORBIDDEN, UN_AUTHORIZED } from '../constants/index.js';
+import { getUserById, getUserDetails } from '../services/auth.services.js';
 import { AppError } from '../utils/AppError.js';
 import { extractToken } from '../utils/user.js';
 import logger from '../config/logger.js';
-import { getPartyByUserId } from '../services/party.services.js';
+
+const ROLE_ADMIN = 'ADMIN';
+const ROLE_PHEAD = 'PHEAD';
 
 export const verifyToken = async (req, res, next) => {
   const token = req.cookies?.access_token;
 
   if (!token) {
-    return next(new AppError('Authorization token is missing', UN_AUTHORIZED));
+    return next(new AppError('Authorization token is missing', FORBIDDEN));
   }
 
   try {
     const decoded = await extractToken(token, env.jwt.access_secret);
 
-    if (!decoded || !decoded.user_id) {
+    if (!decoded?.userId) {
       return next(new AppError('Invalid token payload', UN_AUTHENTICATED));
     }
 
     req.user = decoded;
-    return next();
+    next();
   } catch (err) {
     logger.error('JWT verification failed', err);
     res.clearCookie('access_token');
@@ -31,23 +33,21 @@ export const verifyToken = async (req, res, next) => {
 
 export const attachUser = async (req, res, next) => {
   try {
-    const { user_id } = req.user || {};
+    const { userId } = req.user || {};
 
-    if (!user_id) {
-      return next(new AppError('No user found in token', UN_AUTHORIZED));
+    if (!userId) {
+      return next(new AppError('No user found in token', FORBIDDEN));
     }
 
-    const user = await getUserDetails(user_id, {
-      first_name: true,
-      last_name: true,
+    const user = await getUserDetails(userId, {
+      firstName: true,
+      lastName: true,
+      phoneNumber: true,
       email: true,
-    });
-
-    const userLocation = await getUserLocation(user_id, {
-      state_id: true,
-      constituency_id: true,
-      district_id: true,
-      mandal_id: true,
+      dob: true,
+      profileImage: true,
+      aadharImage: true,
+      aadharNumber: true,
     });
 
     if (!user) {
@@ -55,10 +55,7 @@ export const attachUser = async (req, res, next) => {
       return next(new AppError('User not found', UN_AUTHORIZED));
     }
 
-    req.userDetails = {
-      ...user,
-      ...userLocation,
-    };
+    req.userDetails = user;
     next();
   } catch (err) {
     logger.error('Error fetching user data', err);
@@ -67,47 +64,63 @@ export const attachUser = async (req, res, next) => {
 };
 
 export const isAdmin = (req, res, next) => {
-  const role = req.user?.role;
-
-  if (role !== 'admin') {
-    return next(
-      new AppError(
-        'You do not have the necessary permissions to perform this action',
-        UN_AUTHORIZED
-      )
-    );
+  if (req.user?.role !== ROLE_ADMIN) {
+    return next(new AppError('Only admin can perform this action', FORBIDDEN));
   }
 
   next();
 };
 
 export const isPartyHead = (req, res, next) => {
-  const role = req.user?.role;
-  console.log('role', role);
-  if (role !== 'phead') {
-    return next(
-      new AppError(
-        'You do not have the necessary permissions to perform this action',
-        UN_AUTHORIZED
-      )
-    );
+  if (req.user?.role !== ROLE_PHEAD) {
+    return next(new AppError('Only party heads can perform this action', FORBIDDEN));
   }
 
   next();
 };
 
 export const attachParty = async (req, res, next) => {
-  const { user_id } = req.user;
+  try {
+    const { userId } = req.user;
 
-  if (!user_id) {
-    return next(new AppError('No user found in token', UN_AUTHORIZED));
+    if (!userId) {
+      return next(new AppError('No user found in token', FORBIDDEN));
+    }
+
+    const user = await getUserById(userId, {
+      partyMembers: {
+        select: {
+          party: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    });
+
+    const formattedParty = user.partyMembers[0].party || null;
+
+    if (!formattedParty) {
+      return next(new AppError('Party not found for this user', UN_AUTHORIZED));
+    }
+
+    req.party = formattedParty;
+    next();
+  } catch (err) {
+    logger.error('Error attaching party info', err);
+    return next(new AppError('Failed to attach party data', UN_AUTHORIZED));
+  }
+};
+
+export const isPartyHeadOrAdmin = (req, res, next) => {
+  const { role } = req.user || {};
+  const { party } = req;
+
+  if (role !== ROLE_ADMIN && (!party || party.leaderId !== req.user.userId)) {
+    return next(new AppError('Only admin or party head can perform this action', FORBIDDEN));
   }
 
-  const party = await getPartyByUserId(user_id, { id: true, leader_id: true, name: true });
-  if (!party) {
-    return next(new AppError('Party not found', UN_AUTHORIZED));
-  }
-
-  req.party = party;
   next();
 };

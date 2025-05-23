@@ -16,12 +16,14 @@ import partyRoutes from '../routes/party.routes.js';
 import electionRoutes from '../routes/election.routes.js';
 import { errorHandler } from '../utils/helper.js';
 import env from './env.js';
+import limiter from './rate-limit.js';
 
 const app = express();
 
 app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(limiter);
 app.use(morgan('dev'));
 
 app.use(
@@ -69,5 +71,4 @@ app.use('/api/v1/location', locationRoutes);
 app.use('/api/v1/party', partyRoutes);
 app.use('/api/v1/election', electionRoutes);
 app.use(errorHandler);
-
 export default app;

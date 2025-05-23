@@ -1,9 +1,11 @@
-import { formatError, validateAndUploadImage } from '../utils/helper.js';
+import { formatError, unicodeToEmoji, validateAndUploadImage } from '../utils/helper.js';
 import {
   registerUser,
   updateUserSchema,
   validateAadharImage,
   validateProfileImage,
+  validateSearch,
+  validateWalletAddress,
 } from '../validations/index.js';
 import { AppError } from '../utils/AppError.js';
 import { BAD_REQUEST, CREATED, INTERNAL_SERVER, OK } from '../constants/index.js';
@@ -11,15 +13,15 @@ import logger from '../config/logger.js';
 import {
   getUserById,
   getUserByWalletAddress,
-  getUserDetails,
-  getUserLocation,
   saveUser,
   updateUser,
 } from '../services/auth.services.js';
 import { generateToken } from '../utils/user.js';
 import env from '../config/env.js';
-import { getLocationByStateId } from '../services/location.services.js';
 import { successResponse, errorResponse } from '../utils/response.js';
+import { searchUserByWalletAddress } from '../services/user.services.js';
+import { getConstituencyById, getStateById } from '../services/location.services.js';
+import { getPartyById } from '../services/party.services.js';
 
 export const register = async (req, res) => {
   try {
@@ -29,40 +31,41 @@ export const register = async (req, res) => {
       throw new AppError('Invalid wallet address', BAD_REQUEST, formatError(validatedFields.error));
     }
 
-    const { wallet_address } = validatedFields.data;
+    const { walletAddress } = validatedFields.data;
 
-    const existing_user = await getUserByWalletAddress(wallet_address, {
+    const existing_user = await getUserByWalletAddress(walletAddress, {
       id: true,
-      wallet_address: true,
+      walletAddress: true,
       status: true,
       role: true,
     });
 
     if (existing_user) {
       const access_token = generateToken({
-        user_id: existing_user.id,
-        wallet_address: existing_user.wallet_address,
+        userId: existing_user.id,
+        walletAddress: existing_user.walletAddress,
         status: existing_user.status,
         role: existing_user.role,
       });
 
-      const profile_completed = existing_user.status !== 'incomplete';
+      const profile_completed = existing_user.status !== 'INCOMPLETE';
 
       res.cookie('access_token', access_token, {
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
         sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
       return successResponse(res, { profile_completed }, 'User logged in successfully');
     }
 
-    const saved_user = await saveUser({ wallet_address });
+    const saved_user = await saveUser({ walletAddress });
 
     const access_token = generateToken({
-      user_id: saved_user.id,
-      wallet_address: saved_user.wallet_address,
-      role: saved_user.role === 'admin' ? 'admin' : 'user',
+      userId: saved_user.id,
+      walletAddress: saved_user.walletAddress,
+      role: saved_user.role === 'ADMIN' ? 'ADMIN' : 'USER',
       status: saved_user.status,
     });
 
@@ -70,6 +73,7 @@ export const register = async (req, res) => {
       httpOnly: true,
       secure: env.NODE_ENV === 'production',
       sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return successResponse(
@@ -95,44 +99,49 @@ export const update_profile = async (req, res) => {
       throw new AppError('Invalid input data', BAD_REQUEST, formatError(validatedFields.error));
     }
 
-    const { user_id } = req.user;
-    const user = await getUserById(user_id, { id: true });
+    const { userId } = req.user;
+    const user = await getUserById(userId, { id: true });
     if (!user) {
       throw new AppError('User not found', BAD_REQUEST);
     }
 
-    const profile_image_url = await validateAndUploadImage(
-      req.files.profile_image[0],
+    const profileImageUrl = await validateAndUploadImage(
+      req.files.profileImage[0],
       validateProfileImage
     );
 
-    const aadhar_image_url = await validateAndUploadImage(
-      req.files.aadhar_image[0],
+    const aadharImageUrl = await validateAndUploadImage(
+      req.files.aadharImage[0],
       validateAadharImage
     );
 
     const {
-      first_name,
-      last_name,
-      phone_number,
+      firstName,
+      lastName,
+      phoneNumber,
       email,
-      state_id,
-      district_id,
-      mandal_id,
-      constituency_id,
+      stateId,
+      districtId,
+      mandalId,
+      constituencyId,
+      dob,
+      aadharNumber,
     } = validatedFields.data;
 
+    const dobString = new Date(dob).toISOString();
     const user_payload = {
-      first_name,
-      last_name,
-      phone_number,
+      firstName,
+      lastName,
+      phoneNumber,
       email,
-      profile_image: profile_image_url,
-      aadhar_image: aadhar_image_url,
-      state_id,
-      district_id,
-      mandal_id,
-      constituency_id,
+      profileImage: profileImageUrl,
+      aadharImage: aadharImageUrl,
+      stateId,
+      districtId,
+      mandalId,
+      constituencyId,
+      dobString,
+      aadharNumber,
     };
 
     const updatedUser = await updateUser(user.id, user_payload);
@@ -148,11 +157,11 @@ export const update_profile = async (req, res) => {
 
 export const decode_jwt = async (req, res) => {
   try {
-    const { user_id, wallet_address, role, status } = req.user;
+    const { userId, walletAddress, role, status } = req.user;
     return successResponse(res, {
-      user_id,
-      wallet_address,
-      role: role,
+      userId,
+      walletAddress,
+      role,
       status,
     });
   } catch (error) {
@@ -171,65 +180,212 @@ export const logout = async (req, res) => {
   }
 };
 
-export const get_user = async (req, res) => {
+export const searchUser = async (req, res) => {
   try {
-    const { user_id } = req.user;
-    const user = await getUserById(user_id, {
-      id: true,
-      status: true,
-      is_verified: true,
-    });
-    const userDetails = await getUserDetails(user_id, {
-      first_name: true,
-      last_name: true,
-      phone_number: true,
-      email: true,
-      profile_image: true,
-      aadhar_image: true,
-    });
-    const userLocation = await getUserLocation(user_id, {
-      state_id: true,
-      district_id: true,
-      mandal_id: true,
-      constituency_id: true,
+    const validatedFields = validateSearch.safeParse(req.query);
+
+    if (!validatedFields.success) {
+      throw new AppError('Invalid wallet address', BAD_REQUEST, formatError(validatedFields.error));
+    }
+
+    const { walletAddress, status, role, inParty } = validatedFields.data;
+    const { walletAddress: userWallet } = req.user;
+
+    const formattedStatus = status.split(',').map((s) => s.trim().toUpperCase());
+    const formattedRole = role.split(',').map((r) => r.trim().toUpperCase());
+
+    const users = await searchUserByWalletAddress(
+      userWallet,
+      walletAddress,
+      formattedStatus,
+      formattedRole,
+      inParty === 'true'
+    );
+
+    const formattedUsers = users.slice(0, 5).map((user) => {
+      const userDetails = user.userDetails[0] || {};
+
+      const userData = {
+        id: user.id,
+        walletAddress: user.walletAddress,
+        status: user.status,
+        role: user.role,
+        firstName: userDetails.firstName,
+        lastName: userDetails.lastName,
+        phoneNumber: userDetails.phoneNumber,
+        email: userDetails.email,
+        profileImage: userDetails.profileImage,
+        aadharImage: userDetails.aadharImage,
+        aadharNumber: userDetails.aadharNumber,
+        dob: userDetails.dob,
+      };
+
+      if (inParty && user.partyMembers?.length > 0) {
+        userData.parties = user.partyMembers.map((member) => ({
+          id: member.party.id,
+          name: member.party.name,
+          symbol: member.party.symbol,
+        }));
+      }
+
+      return userData;
     });
 
-    const locationHierarchy = await getLocationByStateId({
-      state_id: userLocation.state_id,
-      district_id: userLocation.district_id,
-      mandal_id: userLocation.mandal_id,
-      constituency_id: userLocation.constituency_id,
+    return successResponse(res, formattedUsers, 'User fetched successfully', OK, null);
+  } catch (error) {
+    console.error('Error searching user:', error);
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+  }
+};
+
+export const get_user_details = async (req, res) => {
+  try {
+    const validatedFields = validateWalletAddress.safeParse(req.query);
+    if (!validatedFields.success) {
+      throw new AppError('Invalid wallet address', BAD_REQUEST, formatError(validatedFields.error));
+    }
+    const { userId } = req.user;
+    const details = await getUserById(userId, {
+      id: true,
+      role: true,
+      status: true,
+      verifiedAt: true,
+      walletAddress: true,
+      userDetails: {
+        select: {
+          firstName: true,
+          lastName: true,
+          phoneNumber: true,
+          email: true,
+          profileImage: true,
+        },
+      },
+      partyMembers: {
+        select: {
+          party: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
+      userLocation: {
+        select: {
+          stateId: true,
+          constituencyId: true,
+        },
+      },
+    });
+
+    if (!details) {
+      throw new AppError('User not found', BAD_REQUEST);
+    }
+
+    const user = {
+      id: details.id,
+      walletAddress: details.walletAddress,
+      status: details.status,
+      role: details.role,
+      verifiedAt: details.verifiedAt,
+      firstName: details.userDetails[0].firstName,
+      lastName: details.userDetails[0].lastName,
+      phoneNumber: details.userDetails[0].phoneNumber,
+      email: details.userDetails[0].email,
+      profileImage: details.userDetails[0].profileImage,
+    };
+    const locationIds = {
+      stateId: details.userLocation[0].stateId,
+      constituencyId: details.userLocation[0].constituencyId,
+    };
+
+    const state_name = await getStateById(locationIds.stateId, {
+      name: true,
+    });
+    const constituency_name = await getConstituencyById(locationIds.constituencyId, {
+      name: true,
     });
 
     const location = {
-      state: {
-        id: locationHierarchy.id,
-        name: locationHierarchy.name,
-      },
-      district: {
-        id: locationHierarchy.District[0].id,
-        name: locationHierarchy.District[0].name,
-      },
-      mandal: {
-        id: locationHierarchy.District[0].Mandal[0].id,
-        name: locationHierarchy.District[0].Mandal[0].name,
-      },
-      constituency: {
-        id: locationHierarchy.District[0].Mandal[0].Constituency[0].id,
-        name: locationHierarchy.District[0].Mandal[0].Constituency[0].name,
-      },
+      state: state_name.name,
+      constituency: constituency_name.name,
     };
-    console.log('Location:', location);
-    return successResponse(
-      res,
-      {
-        ...user,
-        ...userDetails,
-        ...userLocation,
-        location,
-      },
-      'User fetched successfully'
-    );
+
+    user.location = location;
+
+    if (details.partyMembers.length > 0) {
+      const partyId = details.partyMembers[0].party.id;
+      user.partyId = partyId;
+
+      const party = await getPartyById(partyId, {
+        id: true,
+        name: true,
+        symbol: true,
+        details: {
+          select: {
+            logo: true,
+            description: true,
+            headquarters: true,
+            website: true,
+            contact_email: true,
+            contact_phone: true,
+            founded_on: true,
+            abbreviation: true,
+          },
+        },
+        partyMembers: {
+          select: {
+            status: true,
+            userId: true,
+            role: true,
+            createdAt: true,
+          },
+        },
+      });
+      const isLeader = party.partyMembers.some(
+        (member) => member.userId === userId && member.role === 'PHEAD'
+      );
+
+      const userMember = party.partyMembers.find((member) => member.userId === userId);
+
+      user.party = {
+        id: party.id,
+        name: party.name,
+        symbol: unicodeToEmoji(party.symbol),
+        logo: party.details[0].logo,
+        isLeader: isLeader,
+        joinDate: userMember?.createdAt,
+        description: party.details[0].description,
+        status: userMember?.status,
+        headquarters: party.details[0].headquarters,
+        website: party.details[0].website,
+        contact_email: party.details[0].contact_email,
+        contact_phone: party.details[0].contact_phone,
+        founded_on: party.details[0].founded_on,
+        abbreviation: party.details[0].abbreviation,
+      };
+
+      const pending_count = party.partyMembers.filter(
+        (member) => member.status === 'PENDING'
+      ).length;
+      const approved_count = party.partyMembers.filter(
+        (member) => member.status === 'APPROVED'
+      ).length;
+
+      const rejected_count = party.partyMembers.filter(
+        (member) => member.status === 'REJECTED'
+      ).length;
+
+      if (isLeader) {
+        user.party.pending_count = pending_count;
+        user.party.approved_count = approved_count;
+        user.party.rejected_count = rejected_count;
+      }
+    }
+
+    return successResponse(res, user, 'User details fetched successfully', OK);
   } catch (error) {
     logger.error('Error fetching user details:', error);
     if (error instanceof AppError) {

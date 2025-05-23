@@ -2,25 +2,39 @@ import * as z from 'zod';
 import { ObjectId } from 'mongodb';
 
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/jpg'];
-
 const MAX_SIZE = 5 * 1024 * 1024;
-
 const ALLOWED_FIELD_TYPES = [
-  'first_name',
-  'last_name',
-  'phone_number',
+  'firstName',
+  'lastName',
+  'phoneNumber',
   'email',
-  'update_location',
-  'profile_image',
-  'aadhar_image',
+  'profileImage',
+  'aadharImage',
+  'updateLocation',
+  'aadharNumber',
 ];
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-const zodObjectId = z.string().refine((val) => ObjectId.isValid(val), {
-  message: 'Invalid ObjectId',
-});
+const zodObjectId = z
+  .string({
+    required_error: 'ObjectId is required',
+    invalid_type_error: 'ObjectId must be a string',
+  })
+  .refine((val) => ObjectId.isValid(val), {
+    message: 'Invalid ObjectId',
+  });
+
+const requiredString = (fieldName) =>
+  z.string({
+    required_error: `${fieldName} is required`,
+    invalid_type_error: `${fieldName} must be a string`,
+  });
 
 const imageFileSchema = z
-  .any()
+  .any({
+    required_error: 'File is required',
+    invalid_type_error: 'File must be a valid object',
+  })
   .refine((file) => !!file && !!file.mimetype && !!file.size, {
     message: 'File is missing or invalid',
   })
@@ -32,199 +46,220 @@ const imageFileSchema = z
   });
 
 export const registerUser = z.object({
-  wallet_address: z.string().transform((data, ctx) => {
-    if (data.length < 10) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Invalid wallet address',
-      });
-      return z.NEVER;
-    }
-    return data;
+  walletAddress: requiredString('Wallet address').refine((data) => data.length >= 10, {
+    message: 'Invalid wallet address, must be at least 10 characters',
   }),
 });
 
 export const updateUserSchema = z.object({
-  first_name: z
-    .string()
-    .trim()
-    .min(2, { message: 'First name must be at least 2 characters long' }),
-  last_name: z.string().trim().min(2, { message: 'Last name must be at least 2 characters long' }),
-  phone_number: z
-    .string()
-    .trim()
-    .regex(/^\d{10,15}$/, {
-      message: 'Phone number must be between 10 and 15 digits and contain only digits',
-    }),
-  email: z
-    .string()
-    .trim()
+  firstName: requiredString('First name').min(2, {
+    message: 'First name must be at least 2 characters long',
+  }),
+  lastName: requiredString('Last name').min(2, {
+    message: 'Last name must be at least 2 characters long',
+  }),
+  phoneNumber: requiredString('Phone number').regex(/^\d{10,15}$/, {
+    message: 'Phone number must be between 10 and 15 digits and contain only digits',
+  }),
+  email: requiredString('Email')
     .email({ message: 'Invalid email format' })
     .max(50, { message: 'Email must be less than or equal to 50 characters' }),
-  state_id: zodObjectId,
-  district_id: zodObjectId,
-  mandal_id: zodObjectId,
-  constituency_id: zodObjectId,
+  stateId: zodObjectId,
+  districtId: zodObjectId,
+  mandalId: zodObjectId,
+  constituencyId: zodObjectId,
+  dob: requiredString('Date of birth')
+    .refine((val) => /^\d{4}-\d{2}-\d{2}$/.test(val), {
+      message: 'DOB must be in YYYY-MM-DD format',
+    })
+    .refine((val) => !isNaN(Date.parse(val)), {
+      message: 'DOB must be a valid date',
+    }),
+  aadharNumber: requiredString('Aadhar number').regex(/^\d{12}$/, {
+    message: 'Aadhar number must be exactly 12 digits',
+  }),
 });
 
 export const approveUserSchema = z.object({
-  user_id: zodObjectId,
+  userId: zodObjectId,
 });
 
 export const rejectUserSchema = z
   .object({
-    user_id: zodObjectId,
-    reason: z.string().min(10, {
+    userId: zodObjectId,
+    reason: requiredString('Reason').min(10, {
       message: 'Reason must be at least 10 characters long',
     }),
-    rejected_fields: z
-      .array(z.string())
-      .min(1, {
-        message: 'At least one field must be specified for rejection',
-      })
-      .max(5, {
-        message: 'You can reject up to 5 fields at a time',
-      })
-      .optional(),
+    rejectedFields: z
+      .array(requiredString('Rejected field'))
+      .min(1, { message: 'At least one field must be specified for rejection' })
+      .max(5, { message: 'You can reject up to 5 fields at a time' }),
   })
   .refine(
     (data) => {
-      const invalidFields = data.rejected_fields.filter(
+      const invalidFields = data.rejectedFields.filter(
         (field) => !ALLOWED_FIELD_TYPES.includes(field)
       );
-      if (invalidFields.length > 0) {
-        return false;
-      }
-      return true;
+      return invalidFields.length === 0;
     },
     {
-      message: `Invalid field(s) specified for rejection: ${ALLOWED_FIELD_TYPES.join(', ')}`,
+      message: `Invalid field(s) specified for rejection. Allowed fields: ${ALLOWED_FIELD_TYPES.join(
+        ', '
+      )}`,
+      path: ['rejectedFields'],
     }
   );
 
 export const createElectionSchema = z.object({
-  election_name: z.string().nonempty('Election name is required'),
-  election_start_time: z
-    .string()
-    .nonempty('Election start time is required')
-    .refine((val) => !isNaN(Date.parse(val)), {
-      message: 'Invalid date format',
-    }),
-  election_end_time: z
-    .string()
-    .nonempty('Election end time is required')
-    .refine((val) => !isNaN(Date.parse(val)), {
-      message: 'Invalid date format',
-    }),
+  electionName: requiredString('Election name'),
+  electionStartTime: requiredString('Election start time').refine(
+    (val) => !isNaN(Date.parse(val)),
+    {
+      message: 'Invalid date format for election start time',
+    }
+  ),
+  electionEndTime: requiredString('Election end time').refine((val) => !isNaN(Date.parse(val)), {
+    message: 'Invalid date format for election end time',
+  }),
 });
 
 export const validateUserId = z.object({
-  user_id: zodObjectId,
+  userId: zodObjectId,
 });
 
 export const validateWalletAddress = z.object({
-  wallet_address: z.string().nonempty('Wallet address is required'),
+  walletAddress: requiredString('Wallet address'),
 });
 
+export const validateSearch = z
+  .object({
+    walletAddress: requiredString('Wallet address'),
+    status: z.string().optional(),
+    role: z.string().optional(),
+    inParty: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      const { status = '', role = '' } = data;
+
+      const formattedStatus = status
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      const formattedRole = role
+        .split(',')
+        .map((r) => r.trim())
+        .filter((r) => r.length > 0);
+
+      const validStatus = ['approved', 'pending', 'rejected'];
+      const validRole = ['admin', 'user', 'party', 'candidate'];
+
+      const invalidStatus = formattedStatus.filter((s) => !validStatus.includes(s));
+      const invalidRole = formattedRole.filter((r) => !validRole.includes(r));
+
+      return invalidStatus.length === 0 && invalidRole.length === 0;
+    },
+    { message: 'Invalid status or role values' }
+  );
+
 export const createParty = z.object({
-  party_name: z.string().nonempty('Party name is required'),
-  party_symbol: z.string().nonempty('Party symbol is required'),
-  user_id: zodObjectId,
-  link_expiry: z.coerce
+  partyName: requiredString('Party name'),
+  partySymbol: requiredString('Party symbol'),
+  userId: zodObjectId,
+  linkExpiry: z.coerce
     .number({
       required_error: 'Link expiry is required',
       invalid_type_error: 'Link expiry must be a number',
     })
-    .min(1, 'Link expiry must be at least 1 day')
-    .max(30, 'Link expiry cannot be more than 30 days'),
+    .min(1, { message: 'Link expiry must be at least 1 day' })
+    .max(30, { message: 'Link expiry cannot be more than 30 days' }),
 });
 
 export const validateEmailQuery = z.object({
-  email: z.string().email('Invalid email format'),
-  token: z.string().nonempty('Token is required'),
+  walletAddress: requiredString('Wallet address'),
+  token: requiredString('Token'),
+});
+
+export const validatePartyId = z.object({
+  partyId: zodObjectId,
 });
 
 export const updateParty = z.object({
-  contact_email: z.string().email('Invalid email format'),
-  description: z.string(),
-  abbreviation: z.string(),
-  website: z.string().url('Invalid URL format'),
-  contact_phone: z
-    .string()
-    .trim()
-    .regex(/^\d{10,15}$/, {
-      message: 'Phone number must be between 10 and 15 digits and contain only digits',
-    }),
+  contactEmail: requiredString('Contact email').email('Invalid email format'),
+  description: requiredString('Description'),
+  abbreviation: requiredString('Abbreviation'),
+  website: requiredString('Website').url('Invalid URL format'),
+  contactPhone: requiredString('Contact phone').regex(/^\d{10,15}$/, {
+    message: 'Phone number must be between 10 and 15 digits and contain only digits',
+  }),
+  headquarters: requiredString('Headquarters'),
+  foundedOn: requiredString('Founded on'),
+  facebook_url: requiredString('Facebook URL').url('Invalid URL format').optional(),
+  twitter_url: requiredString('Twitter URL').url('Invalid URL format').optional(),
+  instagram_url: requiredString('Instagram URL').url('Invalid URL format').optional(),
 });
-
-const oneDayMs = 24 * 60 * 60 * 1000;
 
 export const createElection = z
   .object({
-    title: z
-      .string()
+    title: requiredString('Title')
       .min(10, { message: 'Title must be at least 10 characters long' })
       .max(100, { message: 'Title must be at most 100 characters long' })
-      .nonempty({ message: 'Title is required' })
       .refine((val) => /^[a-zA-Z0-9 ]+$/.test(val), {
         message: 'Title can only contain letters, numbers, and spaces (no special characters)',
       })
       .transform((val) => val.replace(/\s+/g, '').toLowerCase()),
-    purpose: z
-      .string()
+
+    purpose: requiredString('Purpose')
       .min(10, { message: 'Purpose must be at least 10 characters long' })
       .max(1000, { message: 'Purpose must be at most 1000 characters long' })
-      .nonempty({ message: 'Purpose is required' })
       .refine((val) => /^[a-zA-Z0-9 -]+$/.test(val), {
-        message: 'Purpose can only contain letters, numbers, and spaces (no special characters)',
+        message:
+          'Purpose can only contain letters, numbers, spaces, and hyphens (no special characters)',
       })
       .transform((val) => val.replace(/\s+/g, '').toLowerCase()),
 
-    start_date: z
-      .string()
+    startDate: requiredString('Start date')
       .datetime({ message: 'Invalid start date format' })
       .refine(
         (val) => {
           const now = new Date();
           const start = new Date(val);
-          return start.getTime() - now.getTime() >= oneDayMs;
+          return start.getTime() - now.getTime() >= ONE_DAY_MS;
         },
         { message: 'Start date must be at least 1 day from today' }
       ),
 
-    end_date: z.string().datetime({ message: 'Invalid end date format' }),
+    endDate: requiredString('End date').datetime({ message: 'Invalid end date format' }),
 
-    election_type: z.enum(['lok_sabha', 'vidhan_sabha', 'municipal', 'panchayat', 'by_election'], {
+    electionType: z.enum(['LOK_SABHA', 'VIDHAN_SABHA', 'MUNICIPAL', 'PANCHAYAT', 'BY_ELECTION'], {
       errorMap: () => ({ message: 'Invalid election type' }),
     }),
 
-    constituency_id: zodObjectId,
+    constituencyId: zodObjectId,
   })
   .refine(
     (data) => {
-      const start = new Date(data.start_date);
-      const end = new Date(data.end_date);
-      return end.getTime() - start.getTime() >= oneDayMs;
+      const start = new Date(data.startDate);
+      const end = new Date(data.endDate);
+      return end.getTime() - start.getTime() >= ONE_DAY_MS;
     },
     {
       message: 'End date must be at least 1 day after start date',
-      path: ['end_date'],
+      path: ['endDate'],
     }
   );
 
 export const addCandidateSchema = z.object({
-  election_id: zodObjectId,
+  electionId: zodObjectId,
   candidates: z.array(
     z.object({
-      user_id: zodObjectId,
-      description: z
-        .string()
+      userId: zodObjectId,
+      description: requiredString('Description')
         .min(10, { message: 'Description must be at least 10 characters long' })
         .max(1000, { message: 'Description must be at most 1000 characters long' })
-        .nonempty({ message: 'Description is required' })
         .refine((val) => /^[a-zA-Z0-9 -]+$/.test(val), {
           message:
-            'Description can only contain letters, numbers, and spaces (no special characters)',
+            'Description can only contain letters, numbers, spaces, and hyphens (no special characters)',
         })
         .transform((val) => val.replace(/\s+/g, '').toLowerCase()),
     })
@@ -232,14 +267,19 @@ export const addCandidateSchema = z.object({
 });
 
 export const voteSchema = z.object({
-  election_id: zodObjectId,
-  candidate_id: zodObjectId,
+  electionId: zodObjectId,
+  candidateId: zodObjectId,
 });
 
 export const ResultSchema = z.object({
-  election_id: zodObjectId,
+  electionId: zodObjectId,
 });
-// All Image validations
+
+export const validatePartyIdAndWalletAddress = z.object({
+  partyId: zodObjectId,
+  walletAddress: requiredString('Wallet address'),
+});
+
 export const validateAadharImage = imageFileSchema;
 export const validateProfileImage = imageFileSchema;
 export const validatePartyImage = imageFileSchema;

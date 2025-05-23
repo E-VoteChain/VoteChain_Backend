@@ -23,7 +23,7 @@ export const getCandidateByElectionId = async (election_id, select = {}) => {
   try {
     const candidate = await prisma.candidate.findMany({
       where: {
-        election_id: election_id,
+        electionId: election_id,
       },
       select: select,
     });

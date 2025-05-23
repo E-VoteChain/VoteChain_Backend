@@ -9,235 +9,268 @@ datasource db {
 }
 
 enum Role {
-  admin
-  user
-  phead
+  ADMIN
+  USER
+  PHEAD
 }
 
 enum Status {
-  pending
-  approved
-  rejected
-  incomplete
+  PENDING
+  APPROVED
+  REJECTED
+  INCOMPLETE
 }
 
-enum Election_status {
-  upcoming
-  ongoing
-  completed
+enum ElectionStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
 }
 
-enum Election_level {
-  state
-  district
-  mandal
-  constituency
+enum ElectionLevel {
+  STATE
+  DISTRICT
+  MANDAL
+  CONSTITUENCY
 }
 
-enum Election_type {
-  lok_sabha
-  vidhan_sabha
-  municipal
-  panchayat
-  by_election
+enum ElectionType {
+  LOK_SABHA
+  VIDHAN_SABHA
+  MUNICIPAL
+  PANCHAYAT
+  BY_ELECTION
 }
 
-enum Election_result {
-  pending
-  win
-  lose
+enum ElectionResult {
+  PENDING
+  WIN
+  LOSE
+}
+
+enum TokenStatus {
+  ACTIVE
+  USED
+  EXPIRED
 }
 
 model State {
-  id           String         @id @default(auto()) @map("_id") @db.ObjectId
-  name         String
-  District     District[]
-  UserLocation UserLocation[]
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  districts     District[]
+  userLocations UserLocation[]
 
   @@index([name], name: "state_name")
   @@map("states")
 }
 
 model District {
-  id       String   @id @default(auto()) @map("_id") @db.ObjectId
-  name     String
-  state_id String   @db.ObjectId
-  states   State    @relation(fields: [state_id], references: [id])
-  Mandal   Mandal[]
+  id      String   @id @default(auto()) @map("_id") @db.ObjectId
+  name    String
+  stateId String   @db.ObjectId
+  state   State    @relation(fields: [stateId], references: [id])
+  mandals Mandal[]
 
   @@index([name], name: "district_name")
-  @@index([state_id], name: "district_state_id")
+  @@index([stateId], name: "district_state_id")
   @@map("districts")
 }
 
 model Mandal {
-  id           String         @id @default(auto()) @map("_id") @db.ObjectId
-  name         String
-  district_id  String         @db.ObjectId
-  district     District       @relation(fields: [district_id], references: [id])
-  Constituency Constituency[]
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  districtId     String         @db.ObjectId
+  district       District       @relation(fields: [districtId], references: [id])
+  constituencies Constituency[]
 
   @@index([name], name: "mandal_name")
-  @@index([district_id], name: "mandal_district_id")
+  @@index([districtId], name: "mandal_district_id")
   @@map("mandals")
 }
 
 model Constituency {
-  id        String      @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  mandal_id String      @db.ObjectId
-  mandal    Mandal      @relation(fields: [mandal_id], references: [id])
-  Candidate Candidate[]
-  Election  Election[]
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  mandalId   String      @db.ObjectId
+  mandal     Mandal      @relation(fields: [mandalId], references: [id])
+  candidates Candidate[]
+  elections  Election[]
 
   @@index([name], name: "constituency_name")
-  @@index([mandal_id], name: "constituency_mandal_id")
+  @@index([mandalId], name: "constituency_mandal_id")
   @@map("constituencies")
 }
 
 model Party {
-  id     String @id @default(auto()) @map("_id") @db.ObjectId
-  name   String @unique
-  symbol String @unique
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String    @unique
+  symbol    String    @unique
+  createdBy String?   @db.ObjectId
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  leader_id String @unique @db.ObjectId
-  leader    User   @relation(fields: [leader_id], references: [id], onUpdate: NoAction)
+  details      PartyDetails[] @relation("PartyToDetails")
+  candidates   Candidate[]
+  partyMembers PartyMember[]
+  tokens       PartyToken[]
+}
 
-  party_token  String?
-  token_expiry DateTime?
+model PartyToken {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  token     String      @unique
+  status    TokenStatus @default(ACTIVE)
+  sentAt    DateTime?
+  usedAt    DateTime?
+  expiresAt DateTime?
+  partyId   String      @db.ObjectId
+  party     Party       @relation(fields: [partyId], references: [id])
+  createdAt DateTime    @default(now())
 
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  deleted_at DateTime?
-
-  details   PartyDetails[] @relation("PartyToDetails")
-  Candidate Candidate[]
+  @@index([partyId], name: "party_token_party_id")
 }
 
 model PartyDetails {
-  id            String @id @default(auto()) @map("_id") @db.ObjectId
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
   abbreviation  String
   logo          String
   description   String
-  contact_email String @unique
-  contact_phone String @unique
+  contact_email String   @unique
+  contact_phone String   @unique
   website       String
+  twitter_url   String?
+  facebook_url  String?
+  instagram_url String?
+  founded_on    DateTime
+  headquarters  String
 
   party_id String @unique @db.ObjectId
   party    Party  @relation("PartyToDetails", fields: [party_id], references: [id])
 
-  members User[] @relation("UserPartyMembership")
-
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+}
+
+model PartyMember {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  userId  String @db.ObjectId
+  partyId String @db.ObjectId
+  role    Role   @default(USER)
+  status  Status @default(PENDING)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  party     Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, partyId])
 }
 
 model User {
-  id             String  @id @default(auto()) @map("_id") @db.ObjectId
-  wallet_address String  @unique
-  is_verified    Boolean @default(false)
-  has_voted      Boolean @default(false)
-  election_id    String? @db.ObjectId
-  role           Role    @default(user)
-  status         Status  @default(incomplete)
+  id            String @id @default(auto()) @map("_id") @db.ObjectId
+  walletAddress String @unique
+  role          Role   @default(USER)
+  status        Status @default(INCOMPLETE)
 
-  UserDetails  UserDetails[]
-  UserLocation UserLocation[]
+  userDetails  UserDetails[]
+  userLocation UserLocation[]
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  candidates   Candidate[]
+  votes        Vote[]
+  partyMembers PartyMember[]
 
-  leadParties Party[]
-
-  partyDetails   PartyDetails? @relation("UserPartyMembership", fields: [partyDetailsId], references: [id])
-  partyDetailsId String?       @db.ObjectId
-  Candidate      Candidate[]
-  Vote           Vote[]
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model UserLocation {
-  id              String @id @default(auto()) @map("_id") @db.ObjectId
-  state_id        String @db.ObjectId
-  district_id     String @db.ObjectId
-  mandal_id       String @db.ObjectId
-  constituency_id String @db.ObjectId
-  user_id         String @unique @db.ObjectId
+  id             String @id @default(auto()) @map("_id") @db.ObjectId
+  stateId        String @db.ObjectId
+  districtId     String @db.ObjectId
+  mandalId       String @db.ObjectId
+  constituencyId String @db.ObjectId
+  userId         String @unique @db.ObjectId
 
-  User  User  @relation(fields: [user_id], references: [id])
-  State State @relation(fields: [state_id], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  state     State    @relation(fields: [stateId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  @@index([state_id], name: "user_location_state_id")
-  @@index([district_id], name: "user_location_district_id")
-  @@index([mandal_id], name: "user_location_mandal_id")
-  @@index([constituency_id], name: "user_location_constituency_id")
+  @@index([stateId], name: "user_location_state_id")
+  @@index([districtId], name: "user_location_district_id")
+  @@index([mandalId], name: "user_location_mandal_id")
+  @@index([constituencyId], name: "user_location_constituency_id")
 }
 
 model UserDetails {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  first_name      String
-  last_name       String
-  email           String   @unique
-  phone_number    String   @unique
-  profile_image   String
-  aadhar_image    String
-  rejected_reason String?
-  rejected_fields String[] @default([])
-  user_id         String   @unique @db.ObjectId
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  firstName      String
+  lastName       String
+  dob            DateTime
+  email          String   @unique
+  phoneNumber    String   @unique
+  profileImage   String
+  aadharImage    String
+  aadharNumber   String   @unique
+  rejectedReason String?
+  rejectedFields String[] @default([])
+  userId         String   @unique @db.ObjectId
 
-  User       User     @relation(fields: [user_id], references: [id])
-  created_at DateTime @default(now())
+  submittedAt DateTime  @default(now())
+  approvedAt  DateTime?
+
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
 }
 
 model Election {
-  id              String          @id @default(auto()) @map("_id") @db.ObjectId
-  title           String          @unique
-  purpose         String
-  start_date      DateTime
-  end_date        DateTime
-  level           Election_level  @default(constituency)
-  election_type   Election_type
-  status          Election_status
-  result_declared Boolean         @default(false)
-  constituency_id String          @db.ObjectId
-  constituency    Constituency    @relation(fields: [constituency_id], references: [id])
-  Candidate       Candidate[]
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  title          String         @unique
+  purpose        String
+  startDate      DateTime
+  endDate        DateTime
+  level          ElectionLevel  @default(CONSTITUENCY)
+  electionType   ElectionType
+  status         ElectionStatus
+  resultDeclared Boolean        @default(false)
+  constituencyId String         @db.ObjectId
+  constituency   Constituency   @relation(fields: [constituencyId], references: [id])
+  candidates     Candidate[]
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  Vote       Vote[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  votes     Vote[]
 }
 
 model Candidate {
-  id              String          @id @default(auto()) @map("_id") @db.ObjectId
-  user_id         String          @db.ObjectId
-  party_id        String          @db.ObjectId
-  description     String
-  election_id     String          @db.ObjectId
-  constituency_id String          @db.ObjectId
-  status          Election_result @default(pending)
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String         @db.ObjectId
+  partyId        String         @db.ObjectId
+  description    String
+  electionId     String         @db.ObjectId
+  constituencyId String         @db.ObjectId
+  status         ElectionResult @default(PENDING)
 
-  User         User         @relation(fields: [user_id], references: [id])
-  Party        Party        @relation(fields: [party_id], references: [id])
-  Election     Election     @relation(fields: [election_id], references: [id])
-  Constituency Constituency @relation(fields: [constituency_id], references: [id])
-  created_at   DateTime     @default(now())
-  updated_at   DateTime     @updatedAt
-  Vote         Vote[]
+  user         User         @relation(fields: [userId], references: [id])
+  party        Party        @relation(fields: [partyId], references: [id])
+  election     Election     @relation(fields: [electionId], references: [id])
+  constituency Constituency @relation(fields: [constituencyId], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  votes        Vote[]
 }
 
 model Vote {
-  id           String    @id @default(auto()) @map("_id") @db.ObjectId
-  user_id      String    @db.ObjectId
-  election_id  String    @db.ObjectId
-  candidate_id String    @db.ObjectId
-  election     Election  @relation(fields: [election_id], references: [id])
-  candidate    Candidate @relation(fields: [candidate_id], references: [id])
-  user         User      @relation(fields: [user_id], references: [id])
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String    @db.ObjectId
+  electionId  String    @db.ObjectId
+  candidateId String    @db.ObjectId
+  election    Election  @relation(fields: [electionId], references: [id])
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  @@unique([user_id, election_id])
+  @@unique([userId, electionId])
 }

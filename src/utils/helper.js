@@ -68,8 +68,8 @@ export const upload_to_cloudinary = (fileBuffer) => {
  */
 export const validateUserStatus = (user) => {
   const statusErrors = {
-    approved: 'User already approved',
-    rejected: 'User already rejected',
+    APPROVED: 'User already approved',
+    REJECTED: 'User already rejected',
   };
 
   if (statusErrors[user.status]) {
@@ -145,4 +145,54 @@ export const validateAndUploadImage = async (file, schema) => {
 
   const imageUrl = await upload_to_cloudinary(file.buffer);
   return imageUrl;
+};
+
+export const formatPartyData = (party) => {
+  const details = party.details?.[0] || {};
+
+  const allMembers = party.partyMembers || [];
+
+  const leader = allMembers.find((member) => member.role === 'PHEAD');
+  const leaderEmail = leader?.user?.userDetails?.[0]?.email || null;
+
+  const otherMembers = allMembers.filter((member) => member.role !== 'PHEAD');
+
+  return {
+    id: party.id,
+    name: party.name,
+    symbol: unicodeToEmoji(party.symbol),
+    abbreviation: details.abbreviation,
+    logo: details.logo,
+    description: details.description,
+    contact_email: details.contact_email,
+    contact_phone: details.contact_phone,
+    website: details.website,
+    social_urls: {
+      twitter: details.twitter_url || null,
+      facebook: details.facebook_url || null,
+      instagram: details.instagram_url || null,
+    },
+    founded_on: details.founded_on,
+    headquarters: details.headquarters,
+    leader_email: leaderEmail,
+    leader_name:
+      `${leader?.user?.userDetails?.[0]?.firstName || ''} ${leader?.user?.userDetails?.[0]?.lastName || ''}`.trim(),
+    leader_wallet_address: leader?.user?.walletAddress,
+    tokens: (party.tokens || []).map((token) => ({
+      token: token.token,
+      expiryTime: token.expiresAt,
+      status: token.status,
+    })),
+    partyMembersCount: allMembers.length,
+    partyMembers: otherMembers.map((member) => {
+      const userDetails = member.user?.userDetails?.[0] || {};
+      return {
+        id: member.id,
+        name: `${userDetails.firstName || ''} ${userDetails.lastName || ''}`.trim(),
+        email: userDetails.email || null,
+        wallet_address: member.user?.walletAddress || null,
+        role: member.role || null,
+      };
+    }),
+  };
 };

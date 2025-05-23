@@ -3,12 +3,12 @@ import { AppError } from '../utils/AppError.js';
 import { BAD_REQUEST, INTERNAL_SERVER, NOT_FOUND } from '../constants/index.js';
 import { PrismaClientValidationError } from '@prisma/client/runtime/library';
 
-export const getUserById = async (id, select = {}) => {
+export const getUserById = async (userId, select = {}) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id }, select });
-    if (!user) {
-      throw new AppError('User not found', BAD_REQUEST);
-    }
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: select,
+    });
     return user;
   } catch (error) {
     throw new AppError('User not Found', NOT_FOUND, error);
@@ -32,9 +32,9 @@ export const getUserByIds = async (ids, select = {}) => {
   }
 };
 
-export const getUserByWalletAddress = async (wallet_address, select = {}) => {
+export const getUserByWalletAddress = async (walletAddress, select = {}) => {
   try {
-    const user = await prisma.user.findUnique({ where: { wallet_address }, select });
+    const user = await prisma.user.findUnique({ where: { walletAddress }, select });
     return user;
   } catch (error) {
     console.log('error', error);
@@ -44,10 +44,8 @@ export const getUserByWalletAddress = async (wallet_address, select = {}) => {
 
 export const getUserDetails = async (id, select = {}) => {
   try {
-    const userDetails = await prisma.userDetails.findUnique({ where: { user_id: id }, select });
-    if (!userDetails) {
-      throw new AppError('User details not found', BAD_REQUEST);
-    }
+    const userDetails = await prisma.userDetails.findUnique({ where: { userId: id }, select });
+
     return userDetails;
   } catch (error) {
     throw new AppError('Failed to get user details', INTERNAL_SERVER, error);
@@ -56,7 +54,10 @@ export const getUserDetails = async (id, select = {}) => {
 
 export const getUserLocation = async (id, select = {}) => {
   try {
-    const userLocation = await prisma.userLocation.findUnique({ where: { user_id: id }, select });
+    const userLocation = await prisma.userLocation.findUnique({
+      where: { userId: id },
+      select,
+    });
     if (!userLocation) {
       throw new AppError('User location not found', BAD_REQUEST);
     }
@@ -93,38 +94,42 @@ export const saveUser = async (payload) => {
 
 export const updateUser = async (id, payload) => {
   const {
-    first_name,
-    last_name,
-    phone_number,
+    firstName,
+    lastName,
+    phoneNumber,
     email,
-    profile_image,
-    state_id,
-    district_id,
-    mandal_id,
-    constituency_id,
-    aadhar_image,
+    profileImage,
+    stateId,
+    districtId,
+    mandalId,
+    constituencyId,
+    aadharImage,
+    dobString,
+    aadharNumber,
   } = payload;
   try {
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
-        status: 'pending',
-        UserDetails: {
+        status: 'PENDING',
+        userDetails: {
           create: {
-            first_name,
-            last_name,
-            phone_number,
+            firstName,
+            lastName,
+            phoneNumber,
             email,
-            profile_image,
-            aadhar_image,
+            profileImage,
+            aadharImage,
+            dob: dobString,
+            aadharNumber,
           },
         },
-        UserLocation: {
+        userLocation: {
           create: {
-            state_id: state_id,
-            district_id: district_id,
-            mandal_id: mandal_id,
-            constituency_id: constituency_id,
+            stateId,
+            districtId,
+            mandalId,
+            constituencyId,
           },
         },
       },
@@ -142,17 +147,17 @@ export const updateUser = async (id, payload) => {
 };
 
 export const updateUserLocation = async (_id, payload) => {
-  const { state_id, district_id, mandal_id, constituency_id } = payload;
+  const { stateId, districtId, mandalId, constituencyId } = payload;
   try {
     const updatedLocation = await prisma.user.update({
       where: { id: _id },
       data: {
-        UserLocation: {
+        userLocation: {
           create: {
-            state_id,
-            district_id,
-            mandal_id,
-            constituency_id,
+            stateId,
+            districtId,
+            mandalId,
+            constituencyId,
           },
         },
       },

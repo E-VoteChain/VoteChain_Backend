@@ -302,31 +302,31 @@ const seedData = async () => {
 
     for (const district of state.districts) {
       let districtRecord = await prisma.district.findFirst({
-        where: { name: district.name, state_id: stateRecord.id },
+        where: { name: district.name, stateId: stateRecord.id },
       });
       if (!districtRecord) {
         districtRecord = await prisma.district.create({
-          data: { name: district.name, state_id: stateRecord.id },
+          data: { name: district.name, stateId: stateRecord.id },
         });
       }
 
       for (const mandal of district.mandals) {
         let mandalRecord = await prisma.mandal.findFirst({
-          where: { name: mandal.name, district_id: districtRecord.id },
+          where: { name: mandal.name, districtId: districtRecord.id },
         });
         if (!mandalRecord) {
           mandalRecord = await prisma.mandal.create({
-            data: { name: mandal.name, district_id: districtRecord.id },
+            data: { name: mandal.name, districtId: districtRecord.id },
           });
         }
 
         for (const constituencyName of mandal.constituencies) {
           const exists = await prisma.constituency.findFirst({
-            where: { name: constituencyName, mandal_id: mandalRecord.id },
+            where: { name: constituencyName, mandalId: mandalRecord.id },
           });
           if (!exists) {
             await prisma.constituency.create({
-              data: { name: constituencyName, mandal_id: mandalRecord.id },
+              data: { name: constituencyName, mandalId: mandalRecord.id },
             });
           }
         }

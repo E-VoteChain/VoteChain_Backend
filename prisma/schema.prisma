@@ -247,7 +247,6 @@ model Candidate {
   id             String         @id @default(auto()) @map("_id") @db.ObjectId
   userId         String         @db.ObjectId
   partyId        String         @db.ObjectId
-  description    String
   electionId     String         @db.ObjectId
   constituencyId String         @db.ObjectId
   status         ElectionResult @default(PENDING)

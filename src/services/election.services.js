@@ -1,7 +1,16 @@
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
 import { INTERNAL_SERVER, NOT_FOUND } from '../constants/index.js';
+import { paginate } from '../plugins/paginate.js';
 import { AppError } from '../utils/AppError.js';
+
+export const queryElection = async (filter, options) => {
+  try {
+    return await paginate('election', filter, options);
+  } catch (error) {
+    throw new AppError('Failed to query election', INTERNAL_SERVER, error);
+  }
+};
 
 export const getElectionById = async (id, select = {}) => {
   try {
@@ -49,28 +58,28 @@ export const getElectionByName = async (election_name, select = {}) => {
 };
 
 export const checkOverlappingElection = async (
-  constituency_id,
-  start_date,
-  end_date,
-  election_type
+  constituencyId,
+  startDate,
+  endDate,
+  electionType
 ) => {
   try {
     const election = await prisma.election.findMany({
       where: {
-        constituency_id: constituency_id,
-        election_type: election_type,
+        constituencyId: constituencyId,
+        electionType: electionType,
         AND: [
           {
             OR: [{ status: 'UPCOMING' }, { status: 'ONGOING' }],
           },
           {
             startDate: {
-              lte: end_date,
+              lte: endDate,
             },
           },
           {
             endDate: {
-              gte: start_date,
+              gte: startDate,
             },
           },
         ],
@@ -84,20 +93,20 @@ export const checkOverlappingElection = async (
 };
 
 export const createElection = async (payload) => {
-  const { title, purpose, start_date, end_date, election_type, constituency_id, status } = payload;
+  const { title, purpose, startDate, endDate, electionType, constituencyId, status } = payload;
 
   try {
     const election = await prisma.election.create({
       data: {
         title,
         purpose,
-        start_date,
-        end_date,
-        election_type,
+        startDate,
+        endDate,
+        electionType,
         status,
         constituency: {
           connect: {
-            id: constituency_id,
+            id: constituencyId,
           },
         },
       },
@@ -112,20 +121,23 @@ export const createElection = async (payload) => {
 export const addCandidates = async (payload) => {
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const candidates = payload.map((candidate) => {
-        return tx.candidate.create({
+      const results = [];
+
+      for (const candidate of payload) {
+        const created = await tx.candidate.create({
           data: {
-            userId: candidate.user_id,
-            electionId: candidate.election_id,
-            constituencyId: candidate.constituency_id,
-            partyId: candidate.party_id,
-            description: candidate.description,
+            electionId: candidate.electionId,
+            constituencyId: candidate.constituencyId,
+            partyId: candidate.partyId,
+            userId: candidate.userId,
           },
         });
-      });
+        results.push(created);
+      }
 
-      return await Promise.all(candidates);
+      return results;
     });
+
     return result;
   } catch (error) {
     throw new AppError('Error adding candidates', INTERNAL_SERVER, error);

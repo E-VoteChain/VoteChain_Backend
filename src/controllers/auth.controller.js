@@ -20,7 +20,11 @@ import { generateToken } from '../utils/user.js';
 import env from '../config/env.js';
 import { successResponse, errorResponse } from '../utils/response.js';
 import { searchUserByWalletAddress } from '../services/user.services.js';
-import { getConstituencyById, getStateById } from '../services/location.services.js';
+import {
+  getConstituencyById,
+  getDistrictById,
+  getStateById,
+} from '../services/location.services.js';
 import { getPartyById } from '../services/party.services.js';
 
 export const register = async (req, res) => {
@@ -202,34 +206,52 @@ export const searchUser = async (req, res) => {
       inParty === 'true'
     );
 
-    const formattedUsers = users.slice(0, 5).map((user) => {
-      const userDetails = user.userDetails[0] || {};
+    const formattedUsers = await Promise.all(
+      users.slice(0, 5).map(async (user) => {
+        const userDetails = user.userDetails?.[0] || {};
+        const userLocation = user.userLocation?.[0] || {};
+        const stateName = userLocation.state?.name || '';
+        const districtId = userLocation.districtId;
+        const constituencyId = userLocation.constituencyId;
 
-      const userData = {
-        id: user.id,
-        walletAddress: user.walletAddress,
-        status: user.status,
-        role: user.role,
-        firstName: userDetails.firstName,
-        lastName: userDetails.lastName,
-        phoneNumber: userDetails.phoneNumber,
-        email: userDetails.email,
-        profileImage: userDetails.profileImage,
-        aadharImage: userDetails.aadharImage,
-        aadharNumber: userDetails.aadharNumber,
-        dob: userDetails.dob,
-      };
+        const { name: constituencyName = '' } =
+          (await getConstituencyById(constituencyId, { name: true })) || {};
+        const { name: districtName = '' } =
+          (await getDistrictById(districtId, { name: true })) || {};
 
-      if (inParty && user.partyMembers?.length > 0) {
-        userData.parties = user.partyMembers.map((member) => ({
-          id: member.party.id,
-          name: member.party.name,
-          symbol: member.party.symbol,
-        }));
-      }
+        const userData = {
+          id: user.id,
+          walletAddress: user.walletAddress,
+          status: user.status,
+          role: user.role,
+          firstName: userDetails.firstName,
+          lastName: userDetails.lastName,
+          phoneNumber: userDetails.phoneNumber,
+          email: userDetails.email,
+          profileImage: userDetails.profileImage,
+          aadharImage: userDetails.aadharImage,
+          aadharNumber: userDetails.aadharNumber,
+          dob: userDetails.dob,
+          location: {
+            stateName,
+            districtName,
+            constituencyName,
+          },
+        };
 
-      return userData;
-    });
+        if (inParty && user.partyMembers?.length > 0) {
+          const party = user.partyMembers[0].party;
+          userData.party = {
+            id: party.id,
+            name: party.name,
+            symbol: unicodeToEmoji(party.symbol),
+            logo: party.details?.[0]?.logo || '',
+          };
+        }
+
+        return userData;
+      })
+    );
 
     return successResponse(res, formattedUsers, 'User fetched successfully', OK, null);
   } catch (error) {

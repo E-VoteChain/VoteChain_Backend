@@ -1,5 +1,5 @@
 import logger from '../config/logger.js';
-import { BAD_REQUEST, CREATED, INTERNAL_SERVER } from '../constants/index.js';
+import { BAD_REQUEST, CREATED, INTERNAL_SERVER, OK } from '../constants/index.js';
 import { getUserByIds } from '../services/auth.services.js';
 import {
   addCandidates,
@@ -11,7 +11,9 @@ import {
   getElectionByName,
   getVoteByElectionId,
   updateElectionStatus,
+  queryElection,
 } from '../services/election.services.js';
+import { getConstituencyById } from '../services/location.services.js';
 import { AppError } from '../utils/AppError.js';
 import { formatError } from '../utils/helper.js';
 import { errorResponse, successResponse } from '../utils/response.js';
@@ -30,17 +32,17 @@ export const create_election = async (req, res) => {
       throw new AppError('Invalid election data', BAD_REQUEST, formatError(validatedFields.error));
     }
 
-    const { title, purpose, start_date, end_date, constituency_id, election_type } =
+    const { title, purpose, startDate, endDate, constituencyId, electionType } =
       validatedFields.data;
     const election = await checkOverlappingElection(
-      constituency_id,
-      start_date,
-      end_date,
-      election_type
+      constituencyId,
+      startDate,
+      endDate,
+      electionType
     );
     if (election.length > 0) {
       throw new AppError(
-        `${election_type} election already exists in this constituency`,
+        `${electionType} election already exists in this constituency`,
         BAD_REQUEST
       );
     }
@@ -53,29 +55,30 @@ export const create_election = async (req, res) => {
       throw new AppError('Election with this title already exists', BAD_REQUEST);
     }
 
-    const { user_id } = req.user;
+    const { userId } = req.user;
     let status;
     const present = new Date();
-    const start = new Date(start_date);
+    const start = new Date(startDate);
 
     if (present.getTime() < start.getTime()) {
-      status = 'upcoming';
+      status = 'UPCOMING';
     }
 
     const payload = {
       title,
       purpose,
-      start_date,
-      end_date,
-      constituency_id,
-      election_type,
-      user_id,
+      startDate,
+      endDate,
+      constituencyId,
+      electionType,
+      userId,
       status,
     };
 
     const saved_election = await createElection(payload);
     return successResponse(res, saved_election, 'Election created successfully', CREATED, null);
   } catch (error) {
+    console.error('Error creating election:', error);
     logger.error('Error creation election:', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
@@ -84,105 +87,142 @@ export const create_election = async (req, res) => {
   }
 };
 
-export const add_candidates = async (req, res) => {
+export const get_elections = async (req, res) => {
+  const { page, limit, sortBy } = req.query;
+  const parsedFilter = {
+    resultDeclared: false,
+  };
+
+  const options = {
+    page: parseInt(page) || 1,
+    limit: parseInt(limit) || 10,
+    sortBy: sortBy || 'createdAt',
+    populate: 'constituency,candidates',
+  };
+
   try {
-    const validatedFields = addCandidateSchema.safeParse(req.body);
-    if (!validatedFields.success) {
-      throw new AppError('Invalid candidate data', BAD_REQUEST, formatError(validatedFields.error));
-    }
+    const { results } = await queryElection(parsedFilter, options);
 
-    const { election_id, candidates } = validatedFields.data;
-    const candidate_ids = candidates.map((c) => c.user_id);
-
-    const election = await getElectionById(election_id, {
-      id: true,
-      end_date: true,
-      Candidate: {
-        select: {
-          user_id: true,
-          party_id: true,
-        },
-      },
+    const filteredResults = results.filter((election) => {
+      return election.candidates.length === 0;
     });
 
-    if (!election) {
-      throw new AppError('Election not found', BAD_REQUEST);
+    const formattedElections = filteredResults.map(async (election) => {
+      if (election.constituency) {
+        election.states = await getConstituencyById(election.constituencyId, {
+          id: true,
+          name: true,
+          mandal: {
+            select: {
+              name: true,
+              district: {
+                select: {
+                  name: true,
+                  state: {
+                    select: {
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+
+      const location = election.states;
+      return {
+        id: election.id,
+        title: election.title,
+        purpose: election.purpose,
+        startDate: election.startDate,
+        status: election.status,
+        endDate: election.endDate,
+        electionType: election.electionType,
+        level: election.level,
+        location: {
+          constituencyId: election.constituencyId,
+          constituencyName: location.name,
+          mandalName: location.mandal.name,
+          districtName: location.mandal.district.name,
+          stateName: location.mandal.district.state.name,
+        },
+      };
+    });
+
+    const resolvedElections = await Promise.all(formattedElections);
+
+    return successResponse(res, resolvedElections, 'Elections fetched successfully', OK, req.query);
+  } catch (error) {
+    console.error('Error fetching elections:', error);
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+  }
+};
+
+export const add_candidates = async (req, res) => {
+  try {
+    const validated = addCandidateSchema.safeParse(req.body);
+    if (!validated.success) {
+      throw new AppError('Invalid candidate data', BAD_REQUEST, formatError(validated.error));
     }
 
-    if (election.end_date < new Date()) {
+    const { electionId, constituencyId, candidates } = validated.data;
+    const userIds = candidates.map((c) => c.userId.toString());
+
+    const election = await getElectionById(electionId, {
+      id: true,
+      endDate: true,
+      candidates: { select: { userId: true, partyId: true } },
+    });
+    if (!election) throw new AppError('Election not found', BAD_REQUEST);
+    if (new Date(election.endDate) < new Date()) {
       throw new AppError('Election has already ended', BAD_REQUEST);
     }
 
-    const users = await getUserByIds(candidate_ids, {
+    const users = await getUserByIds(userIds, {
       id: true,
       status: true,
-      UserDetails: {
-        select: {
-          first_name: true,
-          last_name: true,
-        },
-      },
-      leadParties: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      UserLocation: {
-        select: {
-          constituency_id: true,
-        },
-      },
+      userDetails: { select: { firstName: true, lastName: true } },
     });
+    const userMap = new Map(users.map((u) => [u.id.toString(), u]));
 
-    const userMap = new Map(users.map((user) => [user.id.toString(), user]));
-
-    const existingUserIds = new Set(election.Candidate.map((c) => c.user_id.toString()));
-    const existingPartyIds = new Set(election.Candidate.map((c) => c.party_id?.toString()));
+    const existingUserIds = new Set(election.candidates.map((c) => c.userId.toString()));
+    const existingPartyIds = new Set(election.candidates.map((c) => c.partyId.toString()));
+    const seenPartyIds = new Set();
 
     const notFound = [];
     const notApproved = [];
     const alreadyExists = [];
-    const duplicatePartyNames = new Set();
-    const seenPartyIdsInRequest = new Set();
+    const duplicateParties = [];
 
-    for (const { user_id } of candidates) {
-      const userIdStr = user_id.toString();
-      const user = userMap.get(userIdStr);
+    for (const { userId, partyId } of candidates) {
+      const uId = userId.toString();
+      const pId = partyId.toString();
+      const user = userMap.get(uId);
 
       if (!user) {
-        notFound.push(user_id);
+        notFound.push(uId);
         continue;
       }
-
-      if (user.status !== 'approved') {
+      if (user.status !== 'APPROVED') {
         const name =
-          `${user.userDetails?.first_name ?? ''} ${user.userDetails?.last_name ?? ''}`.trim();
-        notApproved.push(name || user.id);
+          `${user.userDetails?.firstName || ''} ${user.userDetails?.lastName || ''}`.trim();
+        notApproved.push(name || uId);
         continue;
       }
-
-      if (existingUserIds.has(userIdStr)) {
-        const name =
-          `${user.userDetails?.first_name ?? ''} ${user.userDetails?.last_name ?? ''}`.trim();
-        alreadyExists.push(name || user.id);
+      if (existingUserIds.has(uId)) {
+        alreadyExists.push(uId);
         continue;
       }
-
-      const party = user.leadParties?.[0];
-      if (!party) {
-        duplicatePartyNames.add(`User ${user.id} is not associated with a party`);
-        continue;
-      }
-
-      const partyId = party.id.toString();
-
-      if (existingPartyIds.has(partyId)) {
-        duplicatePartyNames.add(`${party.name} already has a candidate in this election`);
-      } else if (seenPartyIdsInRequest.has(partyId)) {
-        duplicatePartyNames.add(`Duplicate party in request: ${party.name}`);
+      if (existingPartyIds.has(pId)) {
+        duplicateParties.push(`Party ${pId} already has a candidate`);
+      } else if (seenPartyIds.has(pId)) {
+        duplicateParties.push(`Duplicate party in request: ${pId}`);
       } else {
-        seenPartyIdsInRequest.add(partyId);
+        seenPartyIds.add(pId);
       }
     }
 
@@ -190,37 +230,27 @@ export const add_candidates = async (req, res) => {
     if (notFound.length) errors.push(`User(s) not found: ${notFound.join(', ')}`);
     if (notApproved.length) errors.push(`Unapproved user(s): ${notApproved.join(', ')}`);
     if (alreadyExists.length) errors.push(`Already a candidate: ${alreadyExists.join(', ')}`);
-    if (duplicatePartyNames.size) errors.push(...duplicatePartyNames);
+    if (duplicateParties.length) errors.push(...duplicateParties);
 
     if (errors.length) {
-      throw new AppError('Candidate validation failed', BAD_REQUEST, Array.from(errors));
+      throw new AppError('Candidate validation failed', BAD_REQUEST, errors);
     }
 
-    const validCandidatesPayload = candidates.map(({ user_id, description }) => {
-      const user = userMap.get(user_id.toString());
+    const payload = candidates.map(({ userId, partyId }) => ({
+      userId,
+      partyId,
+      electionId,
+      constituencyId,
+    }));
 
-      return {
-        user_id,
-        party_id: user?.leadParties?.[0]?.id,
-        description,
-        election_id,
-        constituency_id: user?.UserLocation?.[0]?.constituency_id,
-      };
-    });
-
-    const result = await addCandidates(validCandidatesPayload);
+    const result = await addCandidates(payload);
     const response = {
-      election_id,
-      candidates: result.map((candidate) => {
-        return {
-          id: candidate.id,
-          user_id: candidate.user_id,
-          party_id: candidate.party_id,
-        };
-      }),
+      electionId,
+      candidates: result.map((c) => ({ id: c.id, userId: c.userId, partyId: c.partyId })),
     };
-    return successResponse(res, response, 'Candidates added successfully', CREATED, null);
+    return successResponse(res, response, 'Candidates added successfully', CREATED);
   } catch (error) {
+    console.error('Error adding candidates:', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }

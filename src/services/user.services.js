@@ -38,24 +38,12 @@ export const searchUserByWalletAddress = async (
       },
       userLocation: {
         select: {
+          districtId: true,
+          constituencyId: true,
+          mandalId: true,
           state: {
             select: {
               name: true,
-              districts: {
-                select: {
-                  name: true,
-                  mandals: {
-                    select: {
-                      name: true,
-                      constituencies: {
-                        select: {
-                          name: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
             },
           },
         },
@@ -70,6 +58,11 @@ export const searchUserByWalletAddress = async (
               id: true,
               name: true,
               symbol: true,
+              details: {
+                select: {
+                  logo: true,
+                },
+              },
             },
           },
         },

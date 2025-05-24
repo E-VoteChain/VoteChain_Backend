@@ -152,7 +152,7 @@ export const validateSearch = z
         .filter((r) => r.length > 0);
 
       const validStatus = ['approved', 'pending', 'rejected'];
-      const validRole = ['admin', 'user', 'party', 'candidate'];
+      const validRole = ['admin', 'user', 'phead'];
 
       const invalidStatus = formattedStatus.filter((s) => !validStatus.includes(s));
       const invalidRole = formattedRole.filter((r) => !validRole.includes(r));
@@ -206,18 +206,14 @@ export const createElection = z
       .max(100, { message: 'Title must be at most 100 characters long' })
       .refine((val) => /^[a-zA-Z0-9 ]+$/.test(val), {
         message: 'Title can only contain letters, numbers, and spaces (no special characters)',
-      })
-      .transform((val) => val.replace(/\s+/g, '').toLowerCase()),
-
+      }),
     purpose: requiredString('Purpose')
       .min(10, { message: 'Purpose must be at least 10 characters long' })
       .max(1000, { message: 'Purpose must be at most 1000 characters long' })
-      .refine((val) => /^[a-zA-Z0-9 -]+$/.test(val), {
+      .refine((val) => /^[a-zA-Z0-9 - , .]+$/.test(val), {
         message:
           'Purpose can only contain letters, numbers, spaces, and hyphens (no special characters)',
-      })
-      .transform((val) => val.replace(/\s+/g, '').toLowerCase()),
-
+      }),
     startDate: requiredString('Start date')
       .datetime({ message: 'Invalid start date format' })
       .refine(
@@ -250,18 +246,12 @@ export const createElection = z
   );
 
 export const addCandidateSchema = z.object({
+  constituencyId: zodObjectId,
   electionId: zodObjectId,
   candidates: z.array(
     z.object({
       userId: zodObjectId,
-      description: requiredString('Description')
-        .min(10, { message: 'Description must be at least 10 characters long' })
-        .max(1000, { message: 'Description must be at most 1000 characters long' })
-        .refine((val) => /^[a-zA-Z0-9 -]+$/.test(val), {
-          message:
-            'Description can only contain letters, numbers, spaces, and hyphens (no special characters)',
-        })
-        .transform((val) => val.replace(/\s+/g, '').toLowerCase()),
+      partyId: zodObjectId,
     })
   ),
 });

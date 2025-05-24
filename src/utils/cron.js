@@ -10,10 +10,10 @@ export const startElectionCron = async () => {
     try {
       const toStart = await prisma.election.findMany({
         where: {
-          start_date: {
+          startDate: {
             lte: now,
           },
-          status: 'upcoming',
+          status: 'UPCOMING',
         },
       });
 
@@ -25,7 +25,7 @@ export const startElectionCron = async () => {
             },
           },
           data: {
-            status: 'ongoing',
+            status: 'ONGOING',
           },
         });
         console.log(`Started ${toStart.length} election(s).`);
@@ -33,10 +33,10 @@ export const startElectionCron = async () => {
 
       const toEnd = await prisma.election.findMany({
         where: {
-          end_date: {
+          endDate: {
             lte: now,
           },
-          status: 'ongoing',
+          status: 'ONGOING',
         },
       });
 
@@ -48,7 +48,7 @@ export const startElectionCron = async () => {
             },
           },
           data: {
-            status: 'completed',
+            status: 'COMPLETED',
           },
         });
         console.log(`Completed ${toEnd.length} election(s).`);

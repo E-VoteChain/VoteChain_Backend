@@ -1,6 +1,6 @@
 import logger from '../config/logger.js';
-import { BAD_REQUEST, CREATED, INTERNAL_SERVER, OK } from '../constants/index.js';
-import { getUserByIds } from '../services/auth.services.js';
+import { BAD_REQUEST, CREATED, INTERNAL_SERVER, NOT_FOUND, OK } from '../constants/index.js';
+import { getUserByIds, getVoterCount } from '../services/auth.services.js';
 import {
   addCandidates,
   castVote,
@@ -12,10 +12,14 @@ import {
   getVoteByElectionId,
   updateElectionStatus,
   queryElection,
+  getWinnerByElectionId,
+  getElectionVotes,
 } from '../services/election.services.js';
 import { getConstituencyById } from '../services/location.services.js';
 import { AppError } from '../utils/AppError.js';
-import { formatError } from '../utils/helper.js';
+import { getElectionTags, getPriority } from '../utils/election.js';
+import { generateCandidateDescription, generateManifestoDescription } from '../utils/fake-data.js';
+import { formatError, unicodeToEmoji } from '../utils/helper.js';
 import { errorResponse, successResponse } from '../utils/response.js';
 import {
   addCandidateSchema,
@@ -357,6 +361,222 @@ export const declare_result = async (req, res) => {
 
     return successResponse(res, null, 'Result declared successfully', CREATED, null);
   } catch (error) {
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+  }
+};
+
+export const get_elections_by_constituency = async (req, res) => {
+  try {
+    const { constituencyId } = req.userDetails;
+    const { page, limit, sortBy } = req.query;
+
+    const parsedFiler = {
+      constituencyId,
+    };
+    const options = {
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 10,
+      sortBy: sortBy || 'createdAt',
+      populate: 'constituency,candidates,votes',
+    };
+
+    const totalVoters = await getVoterCount(constituencyId);
+
+    const {
+      results,
+      page: currentPage,
+      limit: currentLimit,
+      totalPages,
+      totalResults,
+    } = await queryElection(parsedFiler, options);
+
+    const formattedResults = results.map((election) => {
+      return {
+        id: election.id,
+        title: election.title,
+        purpose: election.purpose,
+        startDate: election.startDate,
+        endDate: election.endDate,
+        priority: getPriority(election.electionType, election.level),
+        electionType: election.electionType,
+        status: election.status,
+        level: election.level,
+        constituency: {
+          id: election.constituency.id,
+          name: election.constituency.name,
+        },
+        candidates_count: election.candidates.length,
+        votes_count: election.votes.length,
+        totalVoters: totalVoters,
+      };
+    });
+
+    return successResponse(res, formattedResults, 'Elections fetched successfully', OK, {
+      page: currentPage,
+      limit: currentLimit,
+      totalPages,
+      totalResults,
+    });
+  } catch (error) {
+    console.log('Error fetching elections by constituency:', error);
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+  }
+};
+
+export const get_election_by_id = async (req, res) => {
+  try {
+    console.log('Fetching election by ID:', req.query);
+    const validatedFields = ResultSchema.safeParse(req.query);
+    if (!validatedFields.success) {
+      throw new AppError('Invalid election ID', BAD_REQUEST, formatError(validatedFields.error));
+    }
+
+    const { electionId } = validatedFields.data;
+    const { userId } = req.user;
+
+    const election = await getElectionById(electionId, {
+      id: true,
+      title: true,
+      purpose: true,
+      startDate: true,
+      endDate: true,
+      level: true,
+      electionType: true,
+      resultDeclared: true,
+      status: true,
+      constituency: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      votes: {
+        where: {
+          userId: userId,
+        },
+        select: {
+          id: true,
+        },
+      },
+      candidates: {
+        select: {
+          id: true,
+          party: {
+            select: {
+              id: true,
+              name: true,
+              symbol: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              userDetails: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  profileImage: true,
+                  dob: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              votes: true,
+            },
+          },
+        },
+      },
+    });
+
+    if (!election) {
+      throw new AppError('Election not found', NOT_FOUND);
+    }
+
+    const totalVoters = await getVoterCount(election.constituency.id);
+    const hasVoted = Array.isArray(election.votes) && election.votes.length > 0;
+
+    const formattedCandidates = election.candidates.map((candidate) => {
+      const base = {
+        id: candidate.id,
+        party: {
+          id: candidate.party.id,
+          name: candidate.party.name,
+          symbol: unicodeToEmoji(candidate.party.symbol),
+          manifesto: generateManifestoDescription(),
+        },
+        user: {
+          id: candidate.user.id,
+          firstName: candidate.user.userDetails[0].firstName,
+          lastName: candidate.user.userDetails[0].lastName,
+          profileImage: candidate.user.userDetails[0].profileImage,
+          dob: candidate.user.userDetails[0].dob,
+          description: generateCandidateDescription(),
+        },
+      };
+
+      if (election.resultDeclared) {
+        base.votes = candidate._count.votes;
+      }
+
+      return base;
+    });
+
+    const formattedElection = {
+      id: election.id,
+      title: election.title,
+      purpose: election.purpose,
+      startDate: election.startDate,
+      endDate: election.endDate,
+      level: election.level,
+      electionType: election.electionType,
+      status: election.status,
+      resultDeclared: election.resultDeclared,
+      tags: getElectionTags(election.electionType, election.level),
+      priority: getPriority(election.electionType, election.level),
+      constituency: {
+        id: election.constituency.id,
+        name: election.constituency.name,
+      },
+      hasVoted,
+      totalVoters,
+      candidates: formattedCandidates,
+    };
+
+    if (election.status === 'ONGOING') {
+      const totalVotesCast = await getElectionVotes(electionId);
+
+      formattedElection.totalVotesCast = totalVotesCast;
+    }
+
+    if (election.resultDeclared) {
+      const winner = await getWinnerByElectionId(electionId, {
+        id: true,
+        userId: true,
+      });
+
+      const winnerCandidate = formattedCandidates.find((c) => c.user.id === winner?.userId);
+
+      formattedElection.winner = winner
+        ? {
+            id: winner.id,
+            party: winnerCandidate?.party,
+            user: winnerCandidate?.user,
+            votes: winnerCandidate?.votes,
+          }
+        : null;
+    }
+
+    return successResponse(res, formattedElection, 'Election fetched successfully', OK, req.query);
+  } catch (error) {
+    console.error('Error fetching election by ID:', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }

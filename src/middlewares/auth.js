@@ -35,9 +35,15 @@ export const attachUser = async (req, res, next) => {
   try {
     const { userId } = req.user || {};
 
+    console.log('userId', userId);
+
     if (!userId) {
       return next(new AppError('No user found in token', FORBIDDEN));
     }
+
+    const location = await getUserById(userId, {
+      userLocation: true,
+    });
 
     const user = await getUserDetails(userId, {
       firstName: true,
@@ -55,9 +61,17 @@ export const attachUser = async (req, res, next) => {
       return next(new AppError('User not found', UN_AUTHORIZED));
     }
 
-    req.userDetails = user;
+    req.userDetails = {
+      ...user,
+      userId,
+      constituencyId: location.userLocation[0]?.constituencyId,
+      districtId: location.userLocation[0]?.districtId,
+      stateId: location.userLocation[0]?.stateId,
+      mandalId: location.userLocation[0]?.mandalId,
+    };
     next();
   } catch (err) {
+    console.error('Error attaching user details', err);
     logger.error('Error fetching user data', err);
     return next(new AppError('Failed to verify user identity', UN_AUTHORIZED));
   }

@@ -3,7 +3,8 @@ import prisma from '../config/db.js';
 import logger from '../config/logger.js';
 
 export const startElectionCron = async () => {
-  cron.schedule('0 * * * *', async () => {
+  // Schedule a cron job to run every minute
+  cron.schedule('* * * * *', async () => {
     logger.info('Running election cron job...');
     const now = new Date();
 

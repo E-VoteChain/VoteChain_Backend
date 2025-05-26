@@ -203,17 +203,10 @@ export const createElection = z
   .object({
     title: requiredString('Title')
       .min(10, { message: 'Title must be at least 10 characters long' })
-      .max(100, { message: 'Title must be at most 100 characters long' })
-      .refine((val) => /^[a-zA-Z0-9 ]+$/.test(val), {
-        message: 'Title can only contain letters, numbers, and spaces (no special characters)',
-      }),
+      .max(100, { message: 'Title must be at most 100 characters long' }),
     purpose: requiredString('Purpose')
       .min(10, { message: 'Purpose must be at least 10 characters long' })
-      .max(1000, { message: 'Purpose must be at most 1000 characters long' })
-      .refine((val) => /^[a-zA-Z0-9 - , .]+$/.test(val), {
-        message:
-          'Purpose can only contain letters, numbers, spaces, and hyphens (no special characters)',
-      }),
+      .max(1000, { message: 'Purpose must be at most 1000 characters long' }),
     startDate: requiredString('Start date')
       .datetime({ message: 'Invalid start date format' })
       .refine(

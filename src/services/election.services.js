@@ -12,6 +12,30 @@ export const queryElection = async (filter, options) => {
   }
 };
 
+export const getWinnerByElectionId = async (electionId, select = {}) => {
+  try {
+    const winner = await prisma.candidate.findFirst({
+      where: {
+        electionId: electionId,
+        status: 'WIN',
+      },
+      select: select,
+    });
+
+    return winner;
+  } catch (error) {
+    throw new AppError('Winner not Found', NOT_FOUND, error);
+  }
+};
+
+export const getElectionVotes = async (electionId) => {
+  return await prisma.vote.count({
+    where: {
+      electionId: electionId,
+    },
+  });
+};
+
 export const getElectionById = async (id, select = {}) => {
   try {
     const election = await prisma.election.findUnique({

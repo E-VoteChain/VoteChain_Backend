@@ -14,6 +14,32 @@ export const getUserById = async (userId, select = {}) => {
     throw new AppError('User not Found', NOT_FOUND, error);
   }
 };
+const today = new Date();
+const eighteenYearsAgo = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+
+export const getVoterCount = async (constituencyId) => {
+  try {
+    return await prisma.user.count({
+      where: {
+        status: 'APPROVED',
+        userLocation: {
+          some: {
+            constituencyId: constituencyId,
+          },
+        },
+        userDetails: {
+          some: {
+            approvedAt: { not: null },
+            dob: { lte: eighteenYearsAgo },
+          },
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching voter count:', error);
+    throw new AppError('Failed to fetch voter count', INTERNAL_SERVER, error);
+  }
+};
 
 export const getUserByIds = async (ids, select = {}) => {
   try {

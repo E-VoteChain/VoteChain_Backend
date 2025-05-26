@@ -283,6 +283,7 @@ export const get_user_details = async (req, res) => {
           phoneNumber: true,
           email: true,
           profileImage: true,
+          dob: true,
         },
       },
       partyMembers: {
@@ -306,6 +307,8 @@ export const get_user_details = async (req, res) => {
       throw new AppError('User not found', BAD_REQUEST);
     }
 
+    console.log('user dob', details.userDetails[0]);
+
     const user = {
       id: details.id,
       walletAddress: details.walletAddress,
@@ -314,6 +317,7 @@ export const get_user_details = async (req, res) => {
       verifiedAt: details.verifiedAt,
       firstName: details.userDetails[0].firstName,
       lastName: details.userDetails[0].lastName,
+      dob: details.userDetails[0].dob,
       phoneNumber: details.userDetails[0].phoneNumber,
       email: details.userDetails[0].email,
       profileImage: details.userDetails[0].profileImage,

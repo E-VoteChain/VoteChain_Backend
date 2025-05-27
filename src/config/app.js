@@ -26,6 +26,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
 app.use(morgan('dev'));
 
+console.log(`CORS enabled for origin: ${env.cors.origin}`);
+
 app.use(
   cors({
     origin: env.cors.origin || 'http://localhost:5173',

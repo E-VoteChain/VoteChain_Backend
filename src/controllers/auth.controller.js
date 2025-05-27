@@ -53,10 +53,9 @@ export const register = async (req, res) => {
       });
 
       const profile_completed = existing_user.status !== 'INCOMPLETE';
-      console.log('env.NODE_ENV', env.NODE_ENV);
       res.cookie('access_token', access_token, {
         httpOnly: true,
-        secure: env.NODE_ENV === 'production',
+        secure: env.env === 'production',
         sameSite: 'none',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
@@ -73,10 +72,9 @@ export const register = async (req, res) => {
       status: saved_user.status,
     });
 
-    console.log('env.NODE_ENV', env.NODE_ENV);
     res.cookie('access_token', access_token, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production',
+      secure: env.env === 'production',
       sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });

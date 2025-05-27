@@ -32,6 +32,19 @@ app.use(
   cors({
     origin: env.cors.origin || 'http://localhost:5173',
     credentials: env.cors.credentials,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'User-Agent',
+    ],
+    exposedHeaders: ['Content-Length', 'X-Requested-With', 'Accept', 'Origin', 'User-Agent'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+    maxAge: 86400,
   })
 );
 

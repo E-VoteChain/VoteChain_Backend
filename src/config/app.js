@@ -27,6 +27,7 @@ app.use(limiter);
 app.use(morgan('dev'));
 
 console.log(`CORS enabled for origin: ${env.cors.origin}`);
+console.log(`CORS credentials: ${env.cors.credentials}`);
 
 app.use(
   cors({

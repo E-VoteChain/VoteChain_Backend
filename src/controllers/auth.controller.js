@@ -337,6 +337,8 @@ export const get_user_details = async (req, res) => {
     const location = {
       state: state_name.name,
       constituency: constituency_name.name,
+      constituencyId: locationIds.constituencyId,
+      stateId: locationIds.stateId,
     };
 
     user.location = location;

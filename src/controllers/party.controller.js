@@ -569,7 +569,12 @@ export const get_all_parties = async (req, res) => {
       },
       'Parties fetched successfully',
       OK,
-      req.query
+      {
+        page: parties.page,
+        limit: parties.limit,
+        totalPages: parties.totalPages,
+        totalResults: parties.totalResults,
+      }
     );
   } catch (error) {
     if (error instanceof AppError) {

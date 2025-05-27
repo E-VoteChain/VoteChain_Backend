@@ -41,6 +41,19 @@ export const getVoterCount = async (constituencyId) => {
   }
 };
 
+export const getVoterCountByElectionId = async (electionId) => {
+  try {
+    return await prisma.vote.count({
+      where: {
+        electionId: electionId,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching voter count by election ID:', error);
+    throw new AppError('Failed to fetch voter count by election ID', INTERNAL_SERVER, error);
+  }
+};
+
 export const getUserByIds = async (ids, select = {}) => {
   try {
     const users = await prisma.user.findMany({
@@ -49,7 +62,7 @@ export const getUserByIds = async (ids, select = {}) => {
           in: ids,
         },
       },
-      select,
+      select: select,
     });
     return users;
   } catch (error) {

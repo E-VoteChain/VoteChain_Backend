@@ -168,11 +168,11 @@ export const addCandidates = async (payload) => {
   }
 };
 
-export const getVoteByElectionId = async (election_id, select = {}) => {
+export const getVoteByElectionId = async (electionId, select = {}) => {
   try {
     const vote = await prisma.vote.findMany({
       where: {
-        election_id: election_id,
+        electionId: electionId,
       },
       select: select,
     });
@@ -183,13 +183,13 @@ export const getVoteByElectionId = async (election_id, select = {}) => {
   }
 };
 
-export const castVote = async (user_id, election_id, candidate_id) => {
+export const castVote = async (userId, electionId, candidateId) => {
   try {
     const vote = await prisma.vote.create({
       data: {
-        user_id,
-        election_id,
-        candidate_id,
+        userId,
+        electionId,
+        candidateId,
       },
     });
     return vote;
@@ -198,36 +198,36 @@ export const castVote = async (user_id, election_id, candidate_id) => {
   }
 };
 
-export const updateElectionStatus = async (election_id, winner_id) => {
+export const updateElectionStatus = async (electionId, winnerId) => {
   try {
     await prisma.$transaction(async (tx) => {
       await tx.candidate.update({
         where: {
-          id: winner_id,
+          id: winnerId,
         },
         data: {
-          status: 'win',
+          status: 'WIN',
         },
       });
 
       await tx.candidate.updateMany({
         where: {
-          election_id: election_id,
+          electionId: electionId,
           NOT: {
-            id: winner_id,
+            id: winnerId,
           },
         },
         data: {
-          status: 'lose',
+          status: 'LOSE',
         },
       });
 
       await tx.election.update({
         where: {
-          id: election_id,
+          id: electionId,
         },
         data: {
-          result_declared: true,
+          resultDeclared: true,
         },
       });
     });

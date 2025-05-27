@@ -166,6 +166,131 @@ export const get_elections = async (req, res) => {
   }
 };
 
+export const getElectionsResults = async (req, res) => {
+  const { page, limit, sortBy } = req.query;
+
+  const parsedFilter = {
+    status: 'COMPLETED',
+  };
+
+  const options = {
+    page: parseInt(page) || 1,
+    limit: parseInt(limit) || 10,
+    sortBy: sortBy || 'createdAt',
+    populate: 'constituency,candidates,votes',
+  };
+
+  try {
+    const {
+      results,
+      page: currentPage,
+      limit: currentLimit,
+      totalPages,
+      totalResults,
+    } = await queryElection(parsedFilter, options);
+
+    const users = await getUserByIds(
+      results.flatMap((election) => election.candidates.map((c) => c.userId)),
+      {
+        id: true,
+        walletAddress: true,
+        userDetails: {
+          select: {
+            firstName: true,
+            lastName: true,
+            profileImage: true,
+          },
+        },
+        partyMembers: {
+          select: {
+            partyId: true,
+            party: {
+              select: {
+                name: true,
+                symbol: true,
+              },
+            },
+          },
+        },
+      }
+    );
+
+    const formattedResult = results.map((election) => {
+      const candidateVotes = election.candidates.map((candidate) => {
+        const voteCount = election.votes.filter((v) => v.candidateId === candidate.id).length;
+        return {
+          candidateId: candidate.id,
+          voteCount,
+        };
+      });
+
+      const totalVotes = election.votes.length;
+
+      const maxVotes = Math.max(...candidateVotes.map((cv) => cv.voteCount));
+
+      const winners = candidateVotes
+        .filter((cv) => cv.voteCount === maxVotes)
+        .map((cv) => cv.candidateId);
+
+      const isDraw = winners.length > 1;
+
+      const candidatesWithVotes = election.candidates.map((candidate) => {
+        const user = users.find((u) => u.id === candidate.userId);
+        const voteCount =
+          candidateVotes.find((cv) => cv.candidateId === candidate.id)?.voteCount || 0;
+        const isWinner = winners.includes(candidate.id);
+
+        return {
+          id: candidate.id,
+          userId: candidate.userId,
+          firstName: user?.userDetails[0].firstName,
+          lastName: user?.userDetails[0].lastName,
+          profileImage: user?.userDetails[0].profileImage,
+          party: {
+            id: user?.partyMembers[0]?.partyId,
+            name: user?.partyMembers[0]?.party.name,
+            symbol: unicodeToEmoji(user?.partyMembers[0]?.party.symbol),
+          },
+          votes: voteCount,
+          winner: isWinner,
+        };
+      });
+
+      return {
+        id: election.id,
+        title: election.title,
+        purpose: election.purpose,
+        startDate: election.startDate,
+        endDate: election.endDate,
+        level: election.level,
+        electionType: election.electionType,
+        status: election.status,
+        resultDeclared: election.resultDeclared,
+        isDraw,
+        totalVotes,
+        constituency: {
+          id: election.constituency.id,
+          name: election.constituency.name,
+        },
+        candidates: candidatesWithVotes,
+      };
+    });
+
+    return successResponse(res, formattedResult, 'Elections results fetched successfully', OK, {
+      page: currentPage,
+      limit: currentLimit,
+      totalPages,
+      totalResults,
+    });
+  } catch (error) {
+    console.error('Error fetching elections results:', error);
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+  }
+};
+
 export const add_candidates = async (req, res) => {
   try {
     const validated = addCandidateSchema.safeParse(req.body);
@@ -270,41 +395,41 @@ export const cast_vote = async (req, res) => {
       throw new AppError('Invalid vote data', BAD_REQUEST, formatError(validatedFields.error));
     }
 
-    const { election_id, candidate_id } = validatedFields.data;
+    const { electionId, candidateId } = validatedFields.data;
 
-    const election = await getElectionById(election_id, {
+    const election = await getElectionById(electionId, {
       id: true,
       status: true,
-      constituency_id: true,
+      constituencyId: true,
     });
 
-    const { user_id } = req.user;
-    const { constituency_id } = req.userDetails;
+    const { userId } = req.user;
+    const { constituencyId } = req.userDetails;
 
     if (!election) {
       throw new AppError('Election not found', BAD_REQUEST);
     }
 
-    if (election.status !== 'ongoing') {
+    if (election.status !== 'ONGOING') {
       throw new AppError('Election is not ongoing', BAD_REQUEST);
     }
 
-    if (election.constituency_id !== constituency_id) {
+    if (election.constituencyId !== constituencyId) {
       throw new AppError('User does not belong to the constituency', BAD_REQUEST);
     }
 
-    const votes = await getVoteByElectionId(election_id, {
+    const votes = await getVoteByElectionId(electionId, {
       id: true,
-      user_id: true,
+      userId: true,
     });
 
-    const existing_vote = votes.find((vote) => vote.user_id === user_id);
+    const existingVote = votes.find((vote) => vote.userId === userId);
 
-    if (existing_vote) {
+    if (existingVote) {
       throw new AppError('User has already voted', BAD_REQUEST);
     }
 
-    await castVote(user_id, election_id, candidate_id);
+    await castVote(userId, electionId, candidateId);
 
     return successResponse(res, null, 'Vote casted successfully', CREATED, null);
   } catch (error) {
@@ -323,20 +448,20 @@ export const declare_result = async (req, res) => {
       throw new AppError('Invalid result data', BAD_REQUEST, formatError(validatedFields.error));
     }
 
-    const { election_id } = validatedFields.data;
-    const election = await getElectionById(election_id, {
+    const { electionId } = validatedFields.data;
+    const election = await getElectionById(electionId, {
       id: true,
       status: true,
-      constituency_id: true,
+      constituencyId: true,
     });
 
-    const candidate = await getCandidateByElectionId(election_id, {
+    const candidate = await getCandidateByElectionId(electionId, {
       id: true,
-      user_id: true,
+      userId: true,
       status: true,
       _count: {
         select: {
-          Vote: true,
+          votes: true,
         },
       },
     });
@@ -345,7 +470,7 @@ export const declare_result = async (req, res) => {
       throw new AppError('Election not found', BAD_REQUEST);
     }
 
-    if (election.status !== 'completed') {
+    if (election.status !== 'COMPLETED') {
       throw new AppError('Election is not completed', BAD_REQUEST);
     }
 
@@ -354,13 +479,14 @@ export const declare_result = async (req, res) => {
     }
 
     const winner = candidate.reduce((prev, current) => {
-      return prev._count.Vote > current._count.Vote ? prev : current;
+      return prev._count.votes > current._count.votes ? prev : current;
     });
 
-    await updateElectionStatus(winner.id);
+    await updateElectionStatus(election.id, winner.id);
 
     return successResponse(res, null, 'Result declared successfully', CREATED, null);
   } catch (error) {
+    console.error('Error declaring result:', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }
@@ -431,7 +557,6 @@ export const get_elections_by_constituency = async (req, res) => {
 
 export const get_election_by_id = async (req, res) => {
   try {
-    console.log('Fetching election by ID:', req.query);
     const validatedFields = ResultSchema.safeParse(req.query);
     if (!validatedFields.success) {
       throw new AppError('Invalid election ID', BAD_REQUEST, formatError(validatedFields.error));

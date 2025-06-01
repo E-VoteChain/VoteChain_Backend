@@ -547,7 +547,6 @@ export const get_elections_by_constituency = async (req, res) => {
       totalResults,
     });
   } catch (error) {
-    console.log('Error fetching elections by constituency:', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }
@@ -602,6 +601,7 @@ export const get_election_by_id = async (req, res) => {
           user: {
             select: {
               id: true,
+              walletAddress: true,
               userDetails: {
                 select: {
                   firstName: true,
@@ -639,6 +639,7 @@ export const get_election_by_id = async (req, res) => {
         },
         user: {
           id: candidate.user.id,
+          walletAddress: candidate.user.walletAddress,
           firstName: candidate.user.userDetails[0].firstName,
           lastName: candidate.user.userDetails[0].lastName,
           profileImage: candidate.user.userDetails[0].profileImage,

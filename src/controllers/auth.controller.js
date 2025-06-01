@@ -5,6 +5,7 @@ import {
   validateAadharImage,
   validateProfileImage,
   validateSearch,
+  validateTransactionReceipt,
   validateWalletAddress,
 } from '../validations/index.js';
 import { AppError } from '../utils/AppError.js';
@@ -13,13 +14,14 @@ import logger from '../config/logger.js';
 import {
   getUserById,
   getUserByWalletAddress,
+  saveTransaction,
   saveUser,
   updateUser,
 } from '../services/auth.services.js';
 import { generateToken } from '../utils/user.js';
 import env from '../config/env.js';
 import { successResponse, errorResponse } from '../utils/response.js';
-import { searchUserByWalletAddress } from '../services/user.services.js';
+import { queryTransactions, searchUserByWalletAddress } from '../services/user.services.js';
 import {
   getConstituencyById,
   getDistrictById,
@@ -56,7 +58,7 @@ export const register = async (req, res) => {
       res.cookie('access_token', access_token, {
         httpOnly: true,
         secure: env.env === 'production',
-        sameSite: 'none',
+        sameSite: env.env === 'production' ? 'none' : 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -75,7 +77,7 @@ export const register = async (req, res) => {
     res.cookie('access_token', access_token, {
       httpOnly: true,
       secure: env.env === 'production',
-      sameSite: 'none',
+      sameSite: env.env === 'production' ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -148,7 +150,21 @@ export const update_profile = async (req, res) => {
     };
 
     const updatedUser = await updateUser(user.id, user_payload);
-    return successResponse(res, updatedUser, 'User updated successfully', CREATED, null);
+    return successResponse(
+      res,
+      {
+        id: updatedUser.id,
+        walletAddress: updatedUser.walletAddress,
+        status: updatedUser.status,
+        role: updatedUser.role,
+        firstName: user_payload.firstName,
+        lastName: user_payload.lastName,
+        profileImage: profileImageUrl,
+      },
+      'User updated successfully',
+      CREATED,
+      null
+    );
   } catch (error) {
     logger.error('Error updating user profile:', error);
     if (error instanceof AppError) {
@@ -306,8 +322,6 @@ export const get_user_details = async (req, res) => {
       throw new AppError('User not found', BAD_REQUEST);
     }
 
-    console.log('user dob', details.userDetails[0]);
-
     const user = {
       id: details.id,
       walletAddress: details.walletAddress,
@@ -397,6 +411,7 @@ export const get_user_details = async (req, res) => {
       const pending_count = party.partyMembers.filter(
         (member) => member.status === 'PENDING'
       ).length;
+      console.log('pending_members', party.partyMembers);
       const approved_count = party.partyMembers.filter(
         (member) => member.status === 'APPROVED'
       ).length;
@@ -415,6 +430,77 @@ export const get_user_details = async (req, res) => {
     return successResponse(res, user, 'User details fetched successfully', OK);
   } catch (error) {
     logger.error('Error fetching user details:', error);
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+  }
+};
+
+export const createTransaction = async (req, res) => {
+  try {
+    const validatedFields = validateTransactionReceipt.safeParse(req.body);
+    if (!validatedFields.success) {
+      throw new AppError(
+        'Invalid transaction receipt',
+        BAD_REQUEST,
+        formatError(validatedFields.error)
+      );
+    }
+
+    const { transactionHash, blockNumber, status, amount, type, from, to } = validatedFields.data;
+
+    const { userId } = req.user;
+
+    const payload = {
+      transactionHash,
+      blockNumber,
+      status,
+      amount,
+      type,
+      from,
+      to,
+      userId,
+    };
+
+    await saveTransaction(payload);
+    return successResponse(res, null, 'Transaction hash updated successfully', OK);
+  } catch (error) {
+    console.error('Error updating transaction hash:', error);
+    logger.error('Error updating transaction hash:', error);
+    console.log;
+    if (error instanceof AppError) {
+      return errorResponse(res, error.message, error.errors, error.statusCode);
+    }
+    return errorResponse(res, 'Something went wrong', error.message, INTERNAL_SERVER);
+  }
+};
+
+export const get_all_transactions = async (req, res) => {
+  const { page, limit, sortBy } = req.query;
+  const { userId } = req.user;
+  const filter = {
+    userId,
+  };
+
+  const options = {
+    page: parseInt(page) || 1,
+    limit: parseInt(limit) || 10,
+    sortBy: sortBy || 'createdAt',
+    populate: '',
+  };
+  try {
+    const results = await queryTransactions(filter, options);
+
+    return successResponse(res, results, 'All transactions fetched successfully', OK, {
+      page: options.page,
+      limit: options.limit,
+      totalPages: results.totalPages,
+      totalResults: results.totalResults,
+    });
+  } catch (error) {
+    console.error('Error fetching all transactions:', error);
+    logger.error('Error fetching all transactions:', error);
     if (error instanceof AppError) {
       return errorResponse(res, error.message, error.errors, error.statusCode);
     }

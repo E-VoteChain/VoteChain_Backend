@@ -179,9 +179,10 @@ model User {
   votes        Vote[]
   partyMembers PartyMember[]
 
-  verifiedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  verifiedAt   DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  transactions EthereumTransaction[]
 }
 
 model UserLocation {
@@ -272,4 +273,24 @@ model Vote {
   updatedAt   DateTime  @updatedAt
 
   @@unique([userId, electionId])
+}
+
+model EthereumTransaction {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String   @db.ObjectId
+  transactionHash   String   @unique
+  amount            String
+  status            String
+  type              String
+  blockNumber       Int
+  gasUsed           Int?
+  cumulativeGasUsed Int?
+  effectiveGasPrice Float?
+  contractAddress   String?
+  to                String
+  from              String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
 }

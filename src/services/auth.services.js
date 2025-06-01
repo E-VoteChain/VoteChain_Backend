@@ -205,3 +205,29 @@ export const updateUserLocation = async (_id, payload) => {
     throw new AppError('Failed to update user location', INTERNAL_SERVER, error);
   }
 };
+
+export const saveTransaction = async (payload) => {
+  try {
+    const { userId, transactionHash, blockNumber, status, amount, type, from, to } = payload;
+
+    return await prisma.ethereumTransaction.create({
+      data: {
+        userId,
+        transactionHash,
+        blockNumber,
+        status,
+        amount,
+        type,
+        from,
+        to,
+      },
+    });
+  } catch (error) {
+    if (error instanceof PrismaClientValidationError) {
+      if (error.code === 'P2002') {
+        throw new AppError('Transaction already exists', BAD_REQUEST, error);
+      }
+    }
+    throw new AppError('Failed to save transaction', INTERNAL_SERVER, error);
+  }
+};

@@ -119,7 +119,7 @@ export const getPendingUsers = async (req, res) => {
 
       const formattedUser = {
         id: user.id,
-        wallet_address: user.walletAddress,
+        walletAddress: user.walletAddress,
         status: user.status,
         firstName: userDetails.firstName,
         lastName: userDetails.lastName,

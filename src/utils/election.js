@@ -31,8 +31,6 @@ export const getElectionTags = (electionType, electionLevel) => {
       tags.push('Unknown Type');
   }
 
-  console.log(`Election Type: ${electionType}, Tags: ${tags.join(', ')}`);
-
   switch (electionLevel) {
     case 'STATE':
       tags.push('State Level');
@@ -47,8 +45,6 @@ export const getElectionTags = (electionType, electionLevel) => {
       tags.push('Constituency Level');
       break;
   }
-
-  console.log(`Election Level: ${electionLevel}, Tags: ${tags.join(', ')}`);
 
   return tags;
 };

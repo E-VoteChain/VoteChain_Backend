@@ -11,6 +11,14 @@ export const queryUsers = async (filter, options) => {
   }
 };
 
+export const queryTransactions = async (filter, options) => {
+  try {
+    return await paginate('ethereumTransaction', filter, options);
+  } catch (error) {
+    throw new AppError('Failed to query transactions', INTERNAL_SERVER, error);
+  }
+};
+
 export const searchUserByWalletAddress = async (
   userWallet,
   walletAddress,

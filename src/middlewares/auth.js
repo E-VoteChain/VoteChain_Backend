@@ -35,8 +35,6 @@ export const attachUser = async (req, res, next) => {
   try {
     const { userId } = req.user || {};
 
-    console.log('userId', userId);
-
     if (!userId) {
       return next(new AppError('No user found in token', FORBIDDEN));
     }

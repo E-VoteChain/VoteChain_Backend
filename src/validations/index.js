@@ -249,6 +249,16 @@ export const addCandidateSchema = z.object({
   ),
 });
 
+export const validateTransactionReceipt = z.object({
+  transactionHash: requiredString('Transaction hash'),
+  from: requiredString('From address'),
+  to: requiredString('To address'),
+  blockNumber: z.number().int().positive().optional(),
+  type: requiredString('Transaction type'),
+  status: requiredString('Transaction status'),
+  amount: requiredString('Amount'),
+});
+
 export const voteSchema = z.object({
   electionId: zodObjectId,
   candidateId: zodObjectId,
